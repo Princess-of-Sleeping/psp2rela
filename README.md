@@ -38,3 +38,5 @@ The ones created with the C SDK are already fully optimized as they are already 
 
 - [ ] Check the validity of the module more.
 - [ ] Optimize code more
+
+It has been tested with some modules, but it may still be buggy and not working. In that case, please open issues.
