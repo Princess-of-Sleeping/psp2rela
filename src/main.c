@@ -38,7 +38,7 @@ int main(int argc, char *argv[]){
 	const char *dst_path = find_item(argc, argv, "-dst=");
 
 	if(argc == 1 || src_path == NULL || dst_path == NULL){
-		printf("file_pcs_sign -src=in_file -dst=out_file\n");
+		printf("psp2rela -src=in_file -dst=out_file\n");
 		return 1;
 	}
 
