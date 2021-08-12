@@ -8,6 +8,7 @@ add_executable(psp2rela
   src/main.c
   src/debug.c
   src/module_loader.c
+  src/module_relocation.c
   src/rela/convert.c
   src/rela/core.c
   src/rela/register.c

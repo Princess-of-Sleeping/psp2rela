@@ -10,9 +10,7 @@
 #include "register.h"
 #include "data_register.h"
 #include "../debug.h"
-
-// WIP
-#define SCE_RELA_USE_ABS32_TYPE (1)
+#include "../rela_config.h"
 
 /*
  * Used by ABS32
@@ -37,7 +35,7 @@ int rela_data_convert(uint32_t segment){
 	SceRelaData *pRelaData;
 	SceRelaTarget *target_tree;
 
-#if defined(SCE_RELA_USE_ABS32_TYPE) && SCE_RELA_USE_ABS32_TYPE != 0
+#if defined(RELA_USE_ABS32_TYPE) && RELA_USE_ABS32_TYPE != 0
 	printf_d("Split to ABS32 ...\n");
 	SceRelaTarget *pRelaTargetAbs32;
 	rela_data_split_abs32(segment, &pRelaTargetAbs32);
@@ -272,7 +270,7 @@ int rela_data_convert(uint32_t segment){
 		}
 	} while(pRelaData != NULL);
 
-#if defined(SCE_RELA_USE_ABS32_TYPE) && SCE_RELA_USE_ABS32_TYPE != 0
+#if defined(RELA_USE_ABS32_TYPE) && RELA_USE_ABS32_TYPE != 0
 
 	SceRelaTarget *pRelaTargetAbs32Next;
 	uint32_t abs32_symbol_segment, abs32_symbol_address, abs32_target_segment, abs32_target_address, cache_address;

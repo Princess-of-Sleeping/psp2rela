@@ -197,7 +197,7 @@ int rela_data_register_write_type5(uint32_t target_offset1, uint32_t append_offs
 
 int rela_data_register_write_type6(uint32_t target_address){
 
-	if(target_address >= 0x10000000)
+	if(target_address >= (1 << 28))
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
 
 	SceRelInfoType6 rel_info;

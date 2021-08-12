@@ -12,6 +12,8 @@
 #include "sysio.h"
 #include "debug.h"
 #include "module_loader.h"
+#include "module_relocation.h"
+#include "rela_config.h"
 #include "rela/convert.h"
 #include "rela/core.h"
 #include "rela/register.h"
@@ -78,6 +80,73 @@ const char *find_item(int argc, char *argv[], const char *name){
 	return NULL;
 }
 
+int rela_do_relocation(ModuleLoaderContext *pContext){
+
+	int res, seg0_idx, seg1_idx, seg0_rel_idx, seg1_rel_idx;
+
+	SceModuleLoadCtx moduleLoadCtx;
+	SceModuleInfoInternal moduleInfoInternal;
+	memset(&moduleLoadCtx, 0, sizeof(moduleLoadCtx));
+	memset(&moduleInfoInternal, 0, sizeof(moduleInfoInternal));
+
+	seg0_idx = module_loader_search_elf_index(pContext, 1, 5);
+	seg1_idx = module_loader_search_elf_index(pContext, 1, 6);
+
+	seg0_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0);
+	seg1_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0x10000);
+
+	moduleLoadCtx.pModuleInfo = &moduleInfoInternal;
+
+	printf_d("seg0_idx:0x%08X\n", seg0_idx);
+	printf_d("seg1_idx:0x%08X\n", seg1_idx);
+	printf_d("seg0_rel_idx:0x%08X\n", seg0_rel_idx);
+	printf_d("seg1_rel_idx:0x%08X\n", seg1_rel_idx);
+
+	if(seg0_idx >= 0){
+		int segment_num = moduleInfoInternal.segments_num;
+
+		uint32_t vaddr = 0x81000000;
+		pContext->pPhdr[seg0_idx].p_vaddr = vaddr;
+		pContext->pPhdr[seg0_idx].p_paddr = vaddr;
+		moduleInfoInternal.segments[segment_num].vaddr = vaddr;
+		moduleInfoInternal.segments[segment_num].memsz  = pContext->pPhdr[seg0_idx].p_memsz;
+		moduleInfoInternal.segments[segment_num].filesz = pContext->pPhdr[seg0_idx].p_filesz;
+		moduleLoadCtx.segments[segment_num].base = pContext->pPhdr[seg0_idx].p_vaddr;
+		moduleLoadCtx.segments[segment_num].pKernelMap = pContext->segment[seg0_idx].pData;
+
+		moduleInfoInternal.segments_num = segment_num + 1;
+
+		printf_i("segment %d new vaddr : 0x%08X(0x%08X)\n", segment_num, vaddr, moduleInfoInternal.segments[segment_num].memsz);
+	}
+
+	if(seg1_idx >= 0){
+		int segment_num = moduleInfoInternal.segments_num;
+
+		uint32_t vaddr = ((0x81000000 + pContext->pPhdr[seg0_idx].p_memsz) + 0xFFF) & ~0xFFF;
+		pContext->pPhdr[seg1_idx].p_vaddr = vaddr;
+		pContext->pPhdr[seg1_idx].p_paddr = vaddr;
+		moduleInfoInternal.segments[segment_num].vaddr = vaddr;
+		moduleInfoInternal.segments[segment_num].memsz  = pContext->pPhdr[seg1_idx].p_memsz;
+		moduleInfoInternal.segments[segment_num].filesz = pContext->pPhdr[seg1_idx].p_filesz;
+		moduleLoadCtx.segments[segment_num].base = pContext->pPhdr[seg1_idx].p_vaddr;
+		moduleLoadCtx.segments[segment_num].pKernelMap = pContext->segment[seg1_idx].pData;
+
+		moduleInfoInternal.segments_num = segment_num + 1;
+
+		printf_i("segment %d new vaddr : 0x%08X(0x%08X)\n", segment_num, vaddr, moduleInfoInternal.segments[segment_num].memsz);
+	}
+
+	res = 0;
+
+	if(res == 0 && seg0_rel_idx >= 0)
+		res = sceKernelModuleRelocation(&moduleLoadCtx, pContext->segment[seg0_rel_idx].pData, pContext->pPhdr[seg0_rel_idx].p_filesz);
+
+	if(res == 0 && seg1_rel_idx >= 0)
+		res = sceKernelModuleRelocation(&moduleLoadCtx, pContext->segment[seg1_rel_idx].pData, pContext->pPhdr[seg1_rel_idx].p_filesz);
+
+	return res;
+}
+
 int main(int argc, char *argv[]){
 
 	int res;
@@ -126,6 +195,14 @@ int main(int argc, char *argv[]){
 			pContext->segment[i].pData = temp_memory_ptr;
 		}
 	}
+
+#if defined(RELA_PRE_RELOCATION) && RELA_PRE_RELOCATION != 0
+	res = rela_do_relocation(pContext);
+	if(res < 0){
+		printf_e("rela_do_relocation failed : 0x%X\n", res);
+		goto error;
+	}
+#endif
 
 	void *rel_config0 = NULL, *rel_config1 = NULL, *rel_config0_res = NULL, *rel_config1_res = NULL;
 	long unsigned int rel_config_size0 = 0, rel_config_size1 = 0;

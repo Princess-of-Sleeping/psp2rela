@@ -10,6 +10,7 @@
 #include "core.h"
 #include "module_relocation_types.h"
 #include "../debug.h"
+#include "../rela_config.h"
 
 SceRelaData *pRelaDataTop = NULL;
 int rela_data_registered_num = 0;
@@ -195,8 +196,6 @@ void rela_data_sort_all(void){
 	}
 }
 
-#define SCE_RELA_ABS32_SORT_ENABLE (1)
-
 int rela_data_split_abs32(uint32_t segment, SceRelaTarget **ppRelaTarget){
 
 	SceRelaTarget *target_tree_current = NULL, *target_symbol_segment1 = NULL, *new_target, *tmp_target, *target_next;
@@ -257,7 +256,7 @@ int rela_data_split_abs32(uint32_t segment, SceRelaTarget **ppRelaTarget){
 		pRelaData = pRelaData->next;
 	}
 
-#if defined(SCE_RELA_ABS32_SORT_ENABLE) && SCE_RELA_ABS32_SORT_ENABLE != 0
+#if defined(RELA_ABS32_SORT_ENABLE) && RELA_ABS32_SORT_ENABLE != 0
 
 	if(target_tree_current == NULL){
 		target_tree_current = target_symbol_segment1;
@@ -343,6 +342,11 @@ int rela_data_add_entry(
 */
 		return 0;
 	}
+
+#if defined(RELA_PRE_RELOCATION) && RELA_PRE_RELOCATION != 0
+	if(type == R_ARM_THM_CALL)
+		return 0;
+#endif
 
 retry:
 	res = rela_data_search_by_symbol_address(symbol_segment, offset_symbol, &pRelaData);
