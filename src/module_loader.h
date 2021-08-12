@@ -24,7 +24,7 @@ typedef struct ModuleLoaderContext {
 	SCE_version *pVersion;
 	segment_info *pSegmentInfo;
 	void *pControlInfo;
-	ModuleSegmentInfo segment[5];
+	ModuleSegmentInfo segment[6];
 } ModuleLoaderContext;
 
 int module_loader_open(const char *path, ModuleLoaderContext **ppResult);
