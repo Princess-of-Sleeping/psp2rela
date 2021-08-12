@@ -59,6 +59,8 @@ int main(int argc, char *argv[]){
 		return 1;
 	}
 
+	printf_d("module open success\n");
+
 	void *rel_config0 = NULL, *rel_config1 = NULL, *rel_config0_res = NULL, *rel_config1_res = NULL;
 	long unsigned int rel_config_size0 = 0, rel_config_size1 = 0;
 	int rel_config_size0_res = 0, rel_config_size1_res = 0;

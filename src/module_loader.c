@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "sysio.h"
+#include "debug.h"
 #include "module_loader.h"
 
 int module_loader_close(ModuleLoaderContext *pContext){
@@ -100,8 +101,10 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 	void         *pControlInfo = NULL;
 	ModuleLoaderContext context;
 
-	if(ppResult == NULL)
+	if(ppResult == NULL){
+		printf_d("ppResult == NULL\n");
 		return -1;
+	}
 
 	*ppResult = NULL;
 	memset(&context, 0, sizeof(context));
@@ -116,27 +119,29 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 		return fd;
 	}
 
+	printf_d("module file open success\n");
+
 	readbyte = read(fd, &cf_header, sizeof(cf_header));
 
 	if(readbyte != sizeof(cf_header) || cf_header.base.m_magic != 0x454353){
-		printf("This self is not SCE self\n");
+		printf_e("This self is not SCE self\n");
 		goto error;
 	}
 
 	if(cf_header.base.m_version != 3){
-		printf("This self is not version 3\n");
+		printf_e("This self is not version 3\n");
 		goto error;
 	}
 
 	if(cf_header.header_v3.m_certified_file_size > 0x10000000){
-		printf("This self is too big\n");
-		printf("Can't processing\n");
+		printf_e("This self is too big\n");
+		printf_e("Can't processing\n");
 		goto error;
 	}
 
 	if(cf_header.header_v3.m_header_length > 0x1000){
-		printf("This header is too big\n");
-		printf("Can't processing\n");
+		printf_e("This header is too big\n");
+		printf_e("Can't processing\n");
 		goto error;
 	}
 
@@ -144,7 +149,7 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 
 	pHeader = malloc(cf_header.header_v3.m_header_length);
 	if(pHeader == NULL){
-		printf("Cannot allocate memory for self header\n");
+		printf_e("Cannot allocate memory for self header\n");
 		goto error;
 	}
 
@@ -152,7 +157,7 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 	readbyte = read(fd, pHeader, cf_header.header_v3.m_header_length);
 
 	if(readbyte != cf_header.header_v3.m_header_length){
-		printf("self header : readbyte != cf_header.header_v3.m_header_length\n");
+		printf_e("self header : readbyte != cf_header.header_v3.m_header_length\n");
 		goto error;
 	}
 
@@ -166,7 +171,7 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 
 	pAppInfo = (SCE_appinfo *)malloc(sizeof(SCE_appinfo));
 	if(pAppInfo == NULL){
-		printf("Cannot allocate memory\n");
+		printf_e("Cannot allocate memory\n");
 		goto error;
 	}
 
@@ -176,7 +181,7 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 
 	pPhdr = (Elf32_Phdr *)malloc(sizeof(Elf32_Phdr) * pEhdr->e_phnum);
 	if(pPhdr == NULL){
-		printf("Cannot allocate memory\n");
+		printf_e("Cannot allocate memory\n");
 		goto error;
 	}
 
@@ -184,7 +189,7 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 
 	pSegmentInfo = (segment_info *)malloc(sizeof(segment_info) * pEhdr->e_phnum);
 	if(pSegmentInfo == NULL){
-		printf("Cannot allocate memory\n");
+		printf_e("Cannot allocate memory\n");
 		goto error;
 	}
 
@@ -192,7 +197,7 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 
 	pVersion = (SCE_version *)malloc(sizeof(SCE_version));
 	if(pVersion == NULL){
-		printf("Cannot allocate memory\n");
+		printf_e("Cannot allocate memory\n");
 		goto error;
 	}
 
@@ -200,52 +205,53 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 
 	pControlInfo = malloc(pExtHeader->controlinfo_size);
 	if(pControlInfo == NULL){
-		printf("Cannot allocate memory\n");
+		printf_e("Cannot allocate memory\n");
 		goto error;
 	}
 
 	memcpy(pControlInfo, (void *)((uintptr_t)pHeader + pExtHeader->controlinfo_offset), pExtHeader->controlinfo_size);
 
+	printf_d("elf segments info\n");
+	printf_d("segment num : 0x%X\n", pEhdr->e_phnum);
 
-/*
-	printf("elf segments info\n");
-	printf("segment num : 0x%X\n", pEhdr->e_phnum);
-*/
 	for(int i=0;i<pEhdr->e_phnum;i++){
-/*
-		printf("[%d] type  :0x%08X offset:0x%08X vaddr:0x%08X paddr:0x%08X\n",
+		printf_d("[%d] type  :0x%08X offset:0x%08X vaddr:0x%08X paddr:0x%08X\n",
 			i,
 			pPhdr[i].p_type,
 			pPhdr[i].p_offset,
 			pPhdr[i].p_vaddr,
 			pPhdr[i].p_paddr
 		);
-		printf("    filesz:0x%08X memsz :0x%08X flags:0x%08X align:0x%08X\n",
+		printf_d("    filesz:0x%08X memsz :0x%08X flags:0x%08X align:0x%08X\n",
 			pPhdr[i].p_filesz,
 			pPhdr[i].p_memsz,
 			pPhdr[i].p_flags,
 			pPhdr[i].p_align
 		);
+		printf_d("offset=0x%08lX length=0x%08lX compression=%ld encryption=%ld\n", pSegmentInfo[i].offset, pSegmentInfo[i].length, pSegmentInfo[i].compression, pSegmentInfo[i].encryption);
 
-		printf("offset=0x%08lX length=0x%08lX compression=%ld encryption=%ld\n", pSegmentInfo[i].offset, pSegmentInfo[i].length, pSegmentInfo[i].compression, pSegmentInfo[i].encryption);
-*/
 		context.segment[i].pData = malloc(pSegmentInfo[i].length);
 		context.segment[i].memsz = pSegmentInfo[i].length;
 		if(context.segment[i].pData == NULL){
-			printf("Cannot allocate memory for segment\n");
+			printf_e("Cannot allocate memory for segment\n");
 			goto error;
 		}
 
 		lseek(fd, pSegmentInfo[i].offset, SEEK_SET);
 		readbyte = read(fd, context.segment[i].pData, pSegmentInfo[i].length);
 		if(readbyte != pSegmentInfo[i].length){
-			printf("segment read error = 0x%X\n", readbyte);
+			printf_e("segment read error = 0x%X\n", readbyte);
 			goto error;
 		}
 	}
 
+	printf_d("Segment read success\n");
+
 	close(fd);
 	fd = -1;
+
+	printf_d("file closed\n");
+	printf_d("context value setting ...\n");
 
 	context.is_elf       = is_elf;
 	context.pHeader      = pHeader;
@@ -257,13 +263,19 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 	context.pVersion = pVersion;
 	context.pControlInfo = pControlInfo;
 
+	printf_d("context value setting ... ok\n");
+
 	*ppResult = malloc(sizeof(context));
 	if(*ppResult == NULL){
-		printf("Cannot allocate memory\n");
+		printf_e("Cannot allocate memory\n");
 		goto error;
 	}
 
+	printf_d("copy context to result ...\n");
+
 	memcpy(*ppResult, &context, sizeof(context));
+
+	printf_d("copy context to result ... ok\n");
 
 	return 0;
 
@@ -273,7 +285,7 @@ error:
 		fd = -1;
 	}
 
-	for(int i=0;i<5;i++){
+	for(int i=0;i<6;i++){
 		if(context.segment[i].pData != NULL)
 			free(context.segment[i].pData);
 	}
