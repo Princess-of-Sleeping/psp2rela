@@ -10,17 +10,22 @@
 #include "core.h"
 #include "register.h"
 #include "module_relocation_types.h"
+#include "../debug.h"
 
 int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, uint32_t x_target_segment){
 
 	const SceRelInfo *_rel_info     = rel_info;
 	const SceRelInfo *_rel_info_end = (const SceRelInfo *)(((uintptr_t)rel_info) + rel_info_size);
 
-	if(rel_info_size == 0)
+	if(rel_info_size == 0){
+		printf_i("No rel info. skip register\n");
 		return 0;
+	}
 
-	if(_rel_info->type >= 2)
+	if(_rel_info->type >= 2){
+		printf_e("First rel info is not type 0 or 1 (first=%d). return 0x%X\n", _rel_info->type, 0x8002D019);
 		return 0x8002D019;
+	}
 
 	int rel_next_size = 0;
 	void *current_seg_dst;
@@ -37,7 +42,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 
 	uint32_t offsets789, bit_shift;
 
-	int sym_seg, count = 0;
+	int sym_seg, count = 0, entry_num = 0;
 
 	while(_rel_info != _rel_info_end){
 
@@ -57,6 +62,8 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			rela_data_add_entry(current_seg_target, offset_target, sym_seg, offset_symbol, rel_type1, x_target_segment);
 			rela_data_add_entry(current_seg_target, offset_target + _rel_info->type0.r_append_offset, sym_seg, offset_symbol, rel_type2, x_target_segment);
 
+			entry_num += 2;
+
 			rel_next_size = sizeof(SceRelInfoType0);
 
 			break;
@@ -72,6 +79,8 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 
 			rela_data_add_entry(current_seg_target, offset_target, sym_seg, offset_symbol, rel_type1, x_target_segment);
 
+			entry_num += 1;
+
 			rel_next_size = sizeof(SceRelInfoType1);
 
 			break;
@@ -86,6 +95,8 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			sym_seg = _rel_info->type2.r_segment_symbol;
 
 			rela_data_add_entry(current_seg_target, offset_target, sym_seg, offset_symbol, rel_type1, x_target_segment);
+
+			entry_num += 1;
 
 			rel_next_size = sizeof(SceRelInfoType2);
 			break;
@@ -107,6 +118,8 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			rela_data_add_entry(current_seg_target, offset_target, sym_seg, offset_symbol, rel_type1, x_target_segment);
 			rela_data_add_entry(current_seg_target, offset_target + _rel_info->type3.r_append_offset, sym_seg, offset_symbol, rel_type2, x_target_segment);
 
+			entry_num += 2;
+
 			rel_next_size = sizeof(SceRelInfoType3);
 
 			break;
@@ -117,6 +130,8 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 
 			rela_data_add_entry(current_seg_target, offset_target, sym_seg, offset_symbol, rel_type1, x_target_segment);
 			rela_data_add_entry(current_seg_target, offset_target + _rel_info->type4.r_append_offset, sym_seg, offset_symbol, rel_type2, x_target_segment);
+
+			entry_num += 2;
 
 			rel_next_size = sizeof(SceRelInfoType4);
 			break;
@@ -132,6 +147,8 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			rela_data_add_entry(current_seg_target, offset_target, sym_seg, offset_symbol, rel_type1, x_target_segment);
 			rela_data_add_entry(current_seg_target, offset_target + _rel_info->type5.r_append_offset2, sym_seg, offset_symbol, rel_type2, x_target_segment);
 
+			entry_num += 4;
+
 			rel_next_size = sizeof(SceRelInfoType5);
 			break;
 
@@ -145,6 +162,8 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 
 			rel_type1 = R_ARM_ABS32;
 			rel_type2 = R_ARM_NONE;
+
+			entry_num += 1;
 
 			rel_next_size = sizeof(SceRelInfoType6);
 			break;
@@ -166,6 +185,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 
 				rela_data_add_entry(current_seg_target, offset_target, sym_seg, offset_symbol, R_ARM_ABS32, x_target_segment);
 
+				entry_num += 1;
 			} while(offsets789 >>= bit_shift);
 
 			rel_type1 = R_ARM_ABS32;
@@ -174,14 +194,15 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			rel_next_size = sizeof(SceRelInfoType789);
 			break;
 		default:
-			printf("unknown code:0x%X\n", _rel_info->type);
+			printf_e("unknown code:0x%X\n", _rel_info->type);
 			return -1;
 		}
 
 		_rel_info = (const SceRelInfo *)(((uintptr_t)_rel_info) + rel_next_size);
 	}
 
-	// printf("%d infos\n", count);
+	printf_d("%d infos, %d entrys (with NONE code)\n", count, entry_num);
+	printf_d("%d entrys (registered)\n", rela_data_get_registered_num());
 
 	return 0;
 }

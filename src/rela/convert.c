@@ -9,11 +9,10 @@
 #include "core.h"
 #include "register.h"
 #include "data_register.h"
+#include "../debug.h"
 
 // WIP
 #define SCE_RELA_USE_ABS32_TYPE (1)
-
-#define printf(...) do{}while(0)
 
 /*
  * Used by ABS32
@@ -30,6 +29,7 @@ const int type789_bit_range_list[3] = {RELA_TYPE9_BIT_RANGE, RELA_TYPE8_BIT_RANG
 
 int rela_data_convert(uint32_t segment){
 
+	int write_count = 0;
 	int res, use_first_type;
 	uint32_t address = 0, append_offset1, append_offset2, rel_type0, rel_type1;
 	uint32_t symbol_segment, current_symbol, target_segment, current_target;
@@ -38,14 +38,16 @@ int rela_data_convert(uint32_t segment){
 	SceRelaTarget *target_tree;
 
 #if defined(SCE_RELA_USE_ABS32_TYPE) && SCE_RELA_USE_ABS32_TYPE != 0
+	printf_d("Split to ABS32 ...\n");
 	SceRelaTarget *pRelaTargetAbs32;
 	rela_data_split_abs32(segment, &pRelaTargetAbs32);
+	printf_d("Split to ABS32 ... OK\n");
 #endif
 
 	do {
 		res = rela_data_get_lowest_entry_by_target(segment, address, &pRelaData);
 		if(res < 0){
-			printf("%s: %s failed = 0x%X\n", __FUNCTION__, "rela_data_get_lowest_entry_by_target", res);
+			printf_e("%s: %s failed = 0x%X\n", __FUNCTION__, "rela_data_get_lowest_entry_by_target", res);
 			return res;
 		}
 
@@ -104,7 +106,8 @@ rel_first_type_none1:
 							append_offset1, rel_type0, rel_type1
 						);
 
-						printf("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 0, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+						printf_t("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 0, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+						write_count += ((rel_type1 != R_ARM_NONE) ? 2 : 1);
 					}else{
 						res = rela_data_register_write_type1(
 							symbol_segment, current_symbol,
@@ -112,13 +115,14 @@ rel_first_type_none1:
 							rel_type0
 						);
 
-						printf("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 1, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+						printf_t("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 1, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+						write_count += 1;
 					}
 
 					if(res != 0){
-						printf("Error happened in write first type : 0x%X\n", res);
-						printf("Should be not happened error here (L%d)\n", __LINE__);
-						printf(
+						printf_e("Error happened in write first type : 0x%X\n", res);
+						printf_e("Should be not happened error here (L%d)\n", __LINE__);
+						printf_e(
 							"symbol=%d:0x%08X target=%d:0x%08X append=0x%08X type=0x%02X/0x%02X\n",
 							symbol_segment, current_symbol,
 							target_segment, current_target,
@@ -163,7 +167,8 @@ rel_first_type_none1:
 						);
 
 						if(res == 0){
-							printf("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 5, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+							printf_t("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 5, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+							write_count += 4;
 
 							current_target = target2->target_address;
 							target_tree = target3->next;
@@ -187,7 +192,8 @@ rel_first_type_none1:
 						);
 
 						if(res == 0){
-							printf("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 4, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+							printf_t("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 4, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+							write_count += 2;
 
 							current_target = target0->target_address;
 							target_tree = target1->next;
@@ -220,7 +226,8 @@ rel_first_type_none1:
 						);
 
 						if(res == 0){
-							printf("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 3, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+							printf_t("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 3, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+							write_count += 2;
 
 							current_target = target0->target_address;
 							target_tree = target1->next;
@@ -246,10 +253,11 @@ rel_first_type_none1:
 						);
 
 						if(res == 0){
-							printf("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 2, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+							printf_t("type%d target=%d:0x%08X symbol=%d:0x%08X type=0x%02X/0x%02X\n", 2, target_segment, target0->target_address, symbol_segment, current_symbol, rel_type0, rel_type1);
+							write_count += 1;
 
 							current_target = target0->target_address;
-							target_tree = target1;
+							target_tree = target0->next;
 							continue;
 						}
 
@@ -261,7 +269,7 @@ rel_first_type_none1:
 				}
 
 				use_first_type = 1;
-				target_tree = target1;
+				target_tree = target0->next;
 			}
 		}
 	} while(pRelaData != NULL);
@@ -294,12 +302,14 @@ rel_first_type_none1:
 			if(res < 0)
 				res = rela_data_register_write_type0(abs32_symbol_segment, abs32_symbol_address, abs32_target_segment, cache_address, 0, R_ARM_ABS32, R_ARM_NONE);
 
-			printf("ASBS32 %d terget=%d:0x%08X, symbol=%d:0x%08X\n", 0, pRelaTargetAbs32->target_segment, cache_address, pRelaTargetAbs32->symbol_segment, pRelaTargetAbs32->symbol_address);
+			printf_t("ASBS32 %d terget=%d:0x%08X, symbol=%d:0x%08X\n", 0, pRelaTargetAbs32->target_segment, cache_address, pRelaTargetAbs32->symbol_segment, pRelaTargetAbs32->symbol_address);
 
 			if(res < 0){
-				printf("ABS32 error\n");
+				printf_e("ABS32 error\n");
 				return res;
 			}
+
+			write_count += 1;
 
 			NEXT_ABS32;
 
@@ -324,7 +334,8 @@ rel_first_type_none1:
 
 					cache_address = pRelaTargetAbs32->target_address;
 
-					printf("ASBS32 %d target_offset=0x%08X (terget=%d:0x%08X, symbol=%d:0x%08X)\n", 9 - counter, address_offset, pRelaTargetAbs32->target_segment, cache_address, pRelaTargetAbs32->symbol_segment, pRelaTargetAbs32->symbol_address);
+					printf_t("ASBS32 %d target_offset=0x%08X (terget=%d:0x%08X, symbol=%d:0x%08X)\n", 9 - counter, address_offset, pRelaTargetAbs32->target_segment, cache_address, pRelaTargetAbs32->symbol_segment, pRelaTargetAbs32->symbol_address);
+					write_count += 1;
 
 					NEXT_ABS32;
 					if(pRelaTargetAbs32 != NULL)
@@ -336,7 +347,7 @@ rel_first_type_none1:
 
 			counter--;
 			if(type789_offset != 0 && counter < 3){
-				printf("type%d = 0x%08X\n", 9 - counter, type789_offset);
+				printf_t("type%d = 0x%08X\n", 9 - counter, type789_offset);
 				if(counter == 0){
 					rela_data_register_write_type9(type789_offset);
 				}else if(counter == 1){
@@ -349,7 +360,8 @@ rel_first_type_none1:
 					res = rela_data_register_write_type6(pRelaTargetAbs32->target_address - cache_address);
 					if(res >= 0){
 
-						printf("ASBS32 %d target_offset=0x%08X (terget=%d:0x%08X, symbol=%d:0x%08X)\n", 6, pRelaTargetAbs32->target_address - cache_address, pRelaTargetAbs32->target_segment, pRelaTargetAbs32->target_address, pRelaTargetAbs32->symbol_segment, pRelaTargetAbs32->symbol_address);
+						printf_t("ASBS32 %d target_offset=0x%08X (terget=%d:0x%08X, symbol=%d:0x%08X)\n", 6, pRelaTargetAbs32->target_address - cache_address, pRelaTargetAbs32->target_segment, pRelaTargetAbs32->target_address, pRelaTargetAbs32->symbol_segment, pRelaTargetAbs32->symbol_address);
+						write_count += 1;
 
 						cache_address = pRelaTargetAbs32->target_address;
 						NEXT_ABS32;
@@ -366,6 +378,8 @@ rel_first_type_none1:
 
 #undef printf
 #endif
+
+	printf_d("Written count=%d\n", write_count);
 
 	return 0;
 }

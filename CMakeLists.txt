@@ -6,6 +6,7 @@ set(CMAKE_C_COMPILE_FEATURES "${CMAKE_C_FLAGS} -Wunused-result -Wl,-q -Wall -O3 
 
 add_executable(psp2rela
   src/main.c
+  src/debug.c
   src/module_loader.c
   src/rela/convert.c
   src/rela/core.c

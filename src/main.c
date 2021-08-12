@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <zlib.h>
 #include "sysio.h"
+#include "debug.h"
 #include "module_loader.h"
 #include "rela/convert.h"
 #include "rela/core.h"
@@ -37,10 +38,15 @@ int main(int argc, char *argv[]){
 	const char *src_path = find_item(argc, argv, "-src=");
 	const char *dst_path = find_item(argc, argv, "-dst=");
 
-	if(argc == 1 || src_path == NULL || dst_path == NULL){
+	if(argc == 1 || src_path == NULL){
 		printf("psp2rela -src=in_file -dst=out_file\n");
 		return 1;
 	}
+
+	const char *log_flag = find_item(argc, argv, "-flag=");
+	const char *log_path = find_item(argc, argv, "-log_dst=");
+
+	rela_debug_init(log_flag, log_path);
 
 	res = module_loader_open(src_path, &pContext);
 	if(res < 0){
@@ -111,6 +117,18 @@ int main(int argc, char *argv[]){
 		goto error;
 	}
 
+	if(rela_is_show_mode() != 0){
+		rela_data_show();
+		rela_data_free();
+
+		free(rel_config0);
+		rel_config0 = NULL;
+		free(rel_config1);
+		rel_config1 = NULL;
+
+		goto module_close;
+	}
+
 	res = rela_data_register_open();
 	if(res < 0){
 		printf("%s failed in %s segment %d\n", "rela_data_register_open", "text", 0);
@@ -134,6 +152,9 @@ int main(int argc, char *argv[]){
 		printf("%s failed in %s segment %d\n", "rela_data_free", "text", 0);
 		goto error;
 	}
+
+	printf_i("Text segment rel config size : 0x%X\n", rel_config_size0_res);
+	printf_d("\n");
 
 	/*
 	 * Convert data segment rel config
@@ -179,6 +200,8 @@ int main(int argc, char *argv[]){
 		printf("%s failed in %s segment %d\n", "rela_data_free", "data", 0);
 		goto error;
 	}
+
+	printf_i("Data segment rel config size : 0x%X\n", rel_config_size1_res);
 
 	/*
 	 * Clean up and settings
@@ -259,11 +282,14 @@ int main(int argc, char *argv[]){
 	/*
 	 * Save re converted module
 	 */
-	module_loader_save(pContext, dst_path);
+	if(dst_path != NULL)
+		module_loader_save(pContext, dst_path);
 
 module_close:
 	module_loader_close(pContext);
 	pContext = NULL;
+
+	rela_debug_fini();
 
 	return 0;
 
@@ -290,6 +316,8 @@ error:
 
 	module_loader_close(pContext);
 	pContext = NULL;
+
+	rela_debug_fini();
 
 	return 1;
 }

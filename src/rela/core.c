@@ -10,10 +10,18 @@
 #include <string.h>
 #include "core.h"
 #include "module_relocation_types.h"
+#include "../debug.h"
 
 SceRelaData *pRelaDataTop = NULL;
+int rela_data_registered_num = 0;
+
+int rela_data_get_registered_num(void){
+	return rela_data_registered_num;
+}
 
 int rela_data_free(void){
+
+	rela_data_registered_num = 0;
 
 	SceRelaData *pRelaData = pRelaDataTop;
 	while(pRelaData != NULL){
@@ -38,19 +46,23 @@ int rela_data_free(void){
 
 int rela_data_show(void){
 
+	int rel_code_num = 0;
 	SceRelaData *pRelaData = pRelaDataTop;
 
 	while(pRelaData != NULL){
-		printf("symbol=%d:0x%08X\n", pRelaData->symbol_segment, pRelaData->symbol_address);
+		printf_d("symbol=%d:0x%08X\n", pRelaData->symbol_segment, pRelaData->symbol_address);
 
 		SceRelaTarget *target_tree = pRelaData->target_tree;
 		while(target_tree != NULL){
-			printf("\t%d:0x%08X type=0x%X\n", target_tree->target_segment, target_tree->target_address, target_tree->type);
+			printf_d("\t%d:0x%08X type=0x%X\n", target_tree->target_segment, target_tree->target_address, target_tree->type);
+			rel_code_num++;
 			target_tree = target_tree->next;
 		}
 
 		pRelaData = pRelaData->next;
 	}
+
+	printf_d("rel code number=%d\n", rel_code_num);
 
 	return 0;
 }
@@ -279,15 +291,13 @@ int rela_data_add_entry(
 	int res;
 	SceRelaData *pRelaData = NULL;
 
-	if(target_segment != x_target_segment || type == R_ARM_NONE){
-		if(0){
-			printf(
-				"Skip : symbol=%d:0x%08X target=%d:0x%08X type=0x%X\n",
-				symbol_segment, offset_symbol,
-				target_segment, offset_target,
-				type
-			);
-		}
+	if(target_segment != x_target_segment || type == R_ARM_NONE || type == R_ARM_V4BX){
+		printf_t(
+			"Skip : symbol=%d:0x%08X target=%d:0x%08X type=0x%X\n",
+			symbol_segment, offset_symbol,
+			target_segment, offset_target,
+			type
+		);
 		return 0;
 	}
 
@@ -312,6 +322,8 @@ retry:
 			pRelaData->target_tree->prev = rela_target;
 
 		pRelaData->target_tree = rela_target;
+
+		rela_data_registered_num++;
 
 	}else{
 		pRelaData = malloc(sizeof(*pRelaData));
