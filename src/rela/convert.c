@@ -236,7 +236,10 @@ int rela_data_convert(uint32_t segment){
 						rel_type1 = _rel_type1;
 					}
 
-					{
+					if(
+						target1 == NULL || 
+						(target1 != NULL && (target1->target_address - target0->target_address) >= (1 << 5))
+					){
 						int _symbol_segment = symbol_segment, _rel_type0 = rel_type0, _rel_type1 = rel_type1;
 						symbol_segment = target0->symbol_segment;
 
@@ -300,7 +303,7 @@ int rela_data_convert(uint32_t segment){
 			printf_t("ASBS32 %d terget=%d:0x%08X, symbol=%d:0x%08X\n", 0, pRelaTargetAbs32->target_segment, cache_address, pRelaTargetAbs32->symbol_segment, pRelaTargetAbs32->symbol_address);
 
 			if(res < 0){
-				printf_e("ABS32 error\n");
+				printf_e("^^^ ABS32 error ^^^\n");
 				return res;
 			}
 
@@ -354,7 +357,6 @@ int rela_data_convert(uint32_t segment){
 				if(pRelaTargetAbs32 != NULL && pRelaTargetAbs32->target_address > cache_address){
 					res = rela_data_register_write_type6(pRelaTargetAbs32->target_address - cache_address);
 					if(res >= 0){
-
 						printf_t("ASBS32 %d target_offset=0x%08X (terget=%d:0x%08X, symbol=%d:0x%08X)\n", 6, pRelaTargetAbs32->target_address - cache_address, pRelaTargetAbs32->target_segment, pRelaTargetAbs32->target_address, pRelaTargetAbs32->symbol_segment, pRelaTargetAbs32->symbol_address);
 						write_count += 1;
 
@@ -374,7 +376,7 @@ int rela_data_convert(uint32_t segment){
 #undef printf
 #endif
 
-	printf_d("Written count=%d\n", write_count);
+	printf_i("Written count=%d\n", write_count);
 
 	return 0;
 }

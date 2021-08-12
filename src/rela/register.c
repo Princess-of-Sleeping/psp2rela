@@ -3,7 +3,6 @@
  * Copyright (C) 2021, Princess of Sleeping
  */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -17,13 +16,15 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 	const SceRelInfo *_rel_info     = rel_info;
 	const SceRelInfo *_rel_info_end = (const SceRelInfo *)(((uintptr_t)rel_info) + rel_info_size);
 
+	rela_data_set_registered_num(0);
+
 	if(rel_info_size == 0){
-		printf_i("No rel info. skip register\n");
+		printf_i("%d:No rel info. skip register\n", x_target_segment);
 		return 0;
 	}
 
 	if(_rel_info->type >= 2){
-		printf_e("First rel info is not type 0 or 1 (first=%d). return 0x%X\n", _rel_info->type, 0x8002D019);
+		printf_e("%d:First rel info is not type 0 or 1 (first=%d). return 0x%X\n", x_target_segment, _rel_info->type, 0x8002D019);
 		return 0x8002D019;
 	}
 
@@ -62,7 +63,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			rela_data_add_entry(current_seg_target, offset_target, sym_seg, offset_symbol, rel_type1, x_target_segment);
 			rela_data_add_entry(current_seg_target, offset_target + _rel_info->type0.r_append_offset, sym_seg, offset_symbol, rel_type2, x_target_segment);
 
-			entry_num += 2;
+			entry_num += ((rel_type2 != R_ARM_NONE) ? 2 : 1);
 
 			rel_next_size = sizeof(SceRelInfoType0);
 
@@ -201,8 +202,8 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 		_rel_info = (const SceRelInfo *)(((uintptr_t)_rel_info) + rel_next_size);
 	}
 
-	printf_d("%d infos, %d entrys (with NONE code)\n", count, entry_num);
-	printf_d("%d entrys (registered)\n", rela_data_get_registered_num());
+	printf_i("%d:%d infos, %d entrys (with NONE code)\n", x_target_segment, count, entry_num);
+	printf_i("%d:%d entrys (registered)\n", x_target_segment, rela_data_get_registered_num());
 
 	return 0;
 }

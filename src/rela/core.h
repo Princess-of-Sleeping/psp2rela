@@ -25,6 +25,7 @@ typedef struct SceRelaData {
 
 int rela_data_free(void);
 int rela_data_get_registered_num(void);
+int rela_data_set_registered_num(int new);
 int rela_data_show(void);
 int rela_data_sort_all(void);
 int rela_data_search_by_symbol_address(uint32_t segment, uint32_t address, SceRelaData **ppRelaData);

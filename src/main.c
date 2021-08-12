@@ -4,7 +4,6 @@
  */
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <stddef.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -39,7 +38,7 @@ int main(int argc, char *argv[]){
 	const char *dst_path = find_item(argc, argv, "-dst=");
 
 	if(argc == 1 || src_path == NULL){
-		printf("psp2rela -src=in_file -dst=out_file\n");
+		printf("psp2rela -src=in_file [-dst=out_file] [-flag=any_flags] [-log_dst=log_path]\n");
 		return 1;
 	}
 
@@ -47,6 +46,12 @@ int main(int argc, char *argv[]){
 	const char *log_path = find_item(argc, argv, "-log_dst=");
 
 	rela_debug_init(log_flag, log_path);
+
+	printf_i("src=%s\n", src_path);
+	if(dst_path != NULL)
+		printf_i("dst=%s\n", dst_path);
+
+	printf_i("\n");
 
 	res = module_loader_open(src_path, &pContext);
 	if(res < 0){
@@ -95,6 +100,8 @@ int main(int argc, char *argv[]){
 			memcpy(rel_config1, pContext->segment[idx].pData, pContext->pPhdr[idx].p_filesz);
 		}
 	}
+
+	printf_i("Original segment rel config size text=0x%08X data=0x%08X\n\n", rel_config_size0, rel_config_size1);
 
 	/*
 	 * Convert text segment rel config
@@ -154,7 +161,7 @@ int main(int argc, char *argv[]){
 	}
 
 	printf_i("Text segment rel config size : 0x%X\n", rel_config_size0_res);
-	printf_d("\n");
+	printf_i("\n");
 
 	/*
 	 * Convert data segment rel config

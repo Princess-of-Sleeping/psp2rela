@@ -4,7 +4,6 @@
  */
 
 #include <stddef.h>
-#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,13 +14,17 @@
 SceRelaData *pRelaDataTop = NULL;
 int rela_data_registered_num = 0;
 
+int rela_data_set_registered_num(int new){
+	int old = rela_data_registered_num;
+	rela_data_registered_num = new;
+	return old;
+}
+
 int rela_data_get_registered_num(void){
 	return rela_data_registered_num;
 }
 
 int rela_data_free(void){
-
-	rela_data_registered_num = 0;
 
 	SceRelaData *pRelaData = pRelaDataTop;
 	while(pRelaData != NULL){
@@ -229,7 +232,7 @@ int rela_data_split_abs32(uint32_t segment, SceRelaTarget **ppRelaTarget){
 	}
 
 	if(target_tree_current->next != NULL){
-		printf("target_tree_current->next != NULL\n");
+		printf_w("target_tree_current->next != NULL\n");
 	}
 
 	target_tree_current->next = target_symbol_segment1;
@@ -337,20 +340,7 @@ retry:
 		pRelaDataTop = pRelaData;
 		pRelaData = NULL;
 
-
-		if(0){
-			printf("register symbol=%d:0x%08X\n", symbol_segment, offset_symbol);
-		}
-
-
-		if(0){
-			printf(
-				"symbol=%d:0x%08X target=%d:0x%08X type=0x%X\n",
-				symbol_segment, offset_symbol,
-				target_segment, offset_target,
-				type
-			);
-		}
+		printf_t("register symbol=%d:0x%08X\n", symbol_segment, offset_symbol);
 
 		goto retry;
 	}
