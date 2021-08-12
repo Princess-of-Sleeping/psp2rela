@@ -18,6 +18,55 @@
 #include "rela/data_register.h"
 #include "rela/module_relocation_types.h"
 
+const char *segment_area[] = {"text", "data"};
+
+int rela_data_convert_helper(
+	uint32_t segment,
+	const void *rel_config0, int rel_config_size0,
+	const void *rel_config1, int rel_config_size1,
+	void **rel_config_res, int *rel_config_size_res
+	){
+
+	int res;
+
+	res = rela_regiser_entrys(rel_config0, rel_config_size0, segment); // Register to split the merged config of vitasdk
+	if(res < 0){
+		printf("%s failed in %s segment %d\n", "rela_regiser_entrys", segment_area[segment], 0);
+		return res;
+	}
+
+	res = rela_regiser_entrys(rel_config1, rel_config_size1, segment); // Register to split the merged config of vitasdk
+	if(res < 0){
+		printf("%s failed in %s segment %d\n", "rela_regiser_entrys", segment_area[segment], 1);
+		return res;
+	}
+
+	rela_data_sort_symbol_by_target_address();
+	rela_data_sort_all();
+
+	res = rela_data_register_open();
+	if(res < 0){
+		printf("%s failed in %s segment %d\n", "rela_data_register_open", segment_area[segment], 0);
+		return res;
+	}
+
+	res = rela_data_convert(segment);
+	if(res < 0){
+		printf("%s failed in %s segment %d\n", "rela_data_convert", segment_area[segment], 0);
+		return res;
+	}
+
+	res = rela_data_register_close(rel_config_res, rel_config_size_res);
+	if(res < 0){
+		printf("%s failed in %s segment %d\n", "rela_data_register_close", segment_area[segment], 0);
+		return res;
+	}
+
+	rela_data_free();
+
+	return 0;
+}
+
 const char *find_item(int argc, char *argv[], const char *name){
 
 	for(int i=0;i<argc;i++){
@@ -61,78 +110,51 @@ int main(int argc, char *argv[]){
 
 	printf_d("module open success\n");
 
+	for(int i=0;i<pContext->pEhdr->e_phnum;i++){
+		if(pContext->pSegmentInfo[i].compression == 2 && pContext->pPhdr[i].p_filesz != 0){
+
+			long unsigned int temp_size = pContext->pPhdr[i].p_filesz;
+			void *temp_memory_ptr = malloc(pContext->pPhdr[i].p_filesz);
+
+			res = uncompress(temp_memory_ptr, &temp_size, pContext->segment[i].pData, pContext->pSegmentInfo[i].length);
+			if(res != Z_OK){
+				printf("zlib uncompress failed : 0x%X\n", res);
+				goto error;
+			}
+
+			free(pContext->segment[i].pData);
+			pContext->segment[i].pData = temp_memory_ptr;
+		}
+	}
+
 	void *rel_config0 = NULL, *rel_config1 = NULL, *rel_config0_res = NULL, *rel_config1_res = NULL;
 	long unsigned int rel_config_size0 = 0, rel_config_size1 = 0;
 	int rel_config_size0_res = 0, rel_config_size1_res = 0;
 
-	res = module_loader_search_elf_index(pContext, 0x60000000, 0);
-	if(res >= 0){
+	int seg0_rel_idx, seg1_rel_idx;
 
-		int idx = res;
-
-		rel_config_size0 = pContext->pPhdr[idx].p_filesz;
-		rel_config0 = malloc(rel_config_size0);
-
-		if(pContext->pSegmentInfo[idx].compression == 2){
-			res = uncompress(rel_config0, &rel_config_size0, pContext->segment[idx].pData, pContext->pSegmentInfo[idx].length);
-			if(res != Z_OK){
-				printf("zlib uncompress failed : 0x%X\n", res);
-				goto error;
-			}
-		}else{
-			memcpy(rel_config0, pContext->segment[idx].pData, pContext->pPhdr[idx].p_filesz);
-		}
+	seg0_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0);
+	seg1_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0x10000);
+	if(seg0_rel_idx < 0){
+		printf_e("cannot get text segment rel config index\n");
+		goto error;
 	}
 
-	res = module_loader_search_elf_index(pContext, 0x60000000, 0x10000);
-	if(res >= 0){
-
-		int idx = res;
-
-		rel_config_size1 = pContext->pPhdr[idx].p_filesz;
-		rel_config1 = malloc(rel_config_size1);
-
-		if(pContext->pSegmentInfo[idx].compression == 2){
-			res = uncompress(rel_config1, &rel_config_size1, pContext->segment[idx].pData, pContext->pSegmentInfo[idx].length);
-			if(res != Z_OK){
-				printf("zlib uncompress failed : 0x%X\n", res);
-				goto error;
-			}
-		}else{
-			memcpy(rel_config1, pContext->segment[idx].pData, pContext->pPhdr[idx].p_filesz);
-		}
+	rel_config0      = pContext->segment[seg0_rel_idx].pData;
+	rel_config_size0 = pContext->pPhdr[seg0_rel_idx].p_filesz;
+	if(seg1_rel_idx >= 0){
+		rel_config1      = pContext->segment[seg1_rel_idx].pData;
+		rel_config_size1 = pContext->pPhdr[seg1_rel_idx].p_filesz;
 	}
 
 	printf_i("Original segment rel config size text=0x%08X data=0x%08X\n\n", rel_config_size0, rel_config_size1);
 
-	/*
-	 * Convert text segment rel config
-	 */
-	res = rela_regiser_entrys(rel_config0, rel_config_size0, 0);
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_regiser_entrys", "text", 0);
-		goto error;
-	}
-
-	res = rela_regiser_entrys(rel_config1, rel_config_size1, 0); // Register to split the merged config of vitasdk
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_regiser_entrys", "text", 1);
-		goto error;
-	}
-
-	res = rela_data_sort_symbol_by_target_address();
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_sort_symbol_by_target_address", "text", 0);
-		goto error;
-	}
-
-	res = rela_data_sort_all();
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_sort_all", "text", 0);
-		goto error;
-	}
-
 	if(rela_is_show_mode() != 0){
+		rela_regiser_entrys(rel_config0, rel_config_size0, 0);
+		rela_regiser_entrys(rel_config1, rel_config_size1, 0); // Register to split the merged config of vitasdk
+		rela_data_sort_symbol_by_target_address();
+		rela_data_sort_all();
+
 		printf_i("\n");
 		printf_i("Text segment\n\n");
 
@@ -150,168 +172,67 @@ int main(int argc, char *argv[]){
 		rela_data_show();
 		rela_data_free();
 
-		free(rel_config0);
-		rel_config0 = NULL;
-		free(rel_config1);
-		rel_config1 = NULL;
-
 		goto module_close;
 	}
 
-	res = rela_data_register_open();
+	/*
+	 * Convert segment rel config
+	 */
+	res = rela_data_convert_helper(0, rel_config0, rel_config_size0, rel_config1, rel_config_size1, &rel_config0_res, &rel_config_size0_res);
 	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_register_open", "text", 0);
-		goto error;
-	}
-
-	res = rela_data_convert(0);
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_convert", "text", 0);
-		goto error;
-	}
-
-	res = rela_data_register_close(&rel_config0_res, &rel_config_size0_res);
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_register_close", "text", 0);
-		goto error;
-	}
-
-	res = rela_data_free();
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_free", "text", 0);
+		printf("%s failed in %s segment %d\n", "rela_data_convert_helper", "text", 0);
 		goto error;
 	}
 
 	printf_i("Text segment rel config size : 0x%X\n", rel_config_size0_res);
 	printf_i("\n");
 
-	/*
-	 * Convert data segment rel config
-	 */
-	res = rela_regiser_entrys(rel_config0, rel_config_size0, 1); // Register to split the merged config of vitasdk
+	res = rela_data_convert_helper(1, rel_config0, rel_config_size0, rel_config1, rel_config_size1, &rel_config1_res, &rel_config_size1_res);
 	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_regiser_entrys", "data", 0);
-		goto error;
-	}
-
-	res = rela_regiser_entrys(rel_config1, rel_config_size1, 1);
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_regiser_entrys", "data", 1);
-		goto error;
-	}
-
-	res = rela_data_sort_symbol_by_target_address();
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_sort_symbol_by_target_address", "data", 0);
-		goto error;
-	}
-
-	res = rela_data_sort_all();
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_sort_all", "data", 0);
-		goto error;
-	}
-
-	res = rela_data_register_open();
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_register_open", "data", 0);
-		goto error;
-	}
-
-	res = rela_data_convert(1);
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_convert", "data", 0);
-		goto error;
-	}
-
-	res = rela_data_register_close(&rel_config1_res, &rel_config_size1_res);
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_register_close", "data", 0);
-		goto error;
-	}
-
-	res = rela_data_free();
-	if(res < 0){
-		printf("%s failed in %s segment %d\n", "rela_data_free", "data", 0);
+		printf("%s failed in %s segment %d\n", "rela_data_convert_helper", "data", 0);
 		goto error;
 	}
 
 	printf_i("Data segment rel config size : 0x%X\n", rel_config_size1_res);
 
 	/*
-	 * Clean up and settings
+	 * Update segment infos
 	 */
-	free(rel_config0);
-	rel_config0 = NULL;
-	free(rel_config1);
-	rel_config1 = NULL;
+	if(seg1_rel_idx < 0 && rel_config1_res != NULL)
+		seg1_rel_idx = module_loader_add_elf_entry(pContext, 0x60000000, 0x10000);
 
-	rel_config0 = rel_config0_res;
-	rel_config1 = rel_config1_res;
-	rel_config_size0 = rel_config_size0_res;
-	rel_config_size1 = rel_config_size1_res;
+	if(seg1_rel_idx < 0 && rel_config1_res != NULL){
+		printf_e("cannot add elf entry\n");
+		goto error;
+	}
+
+	free(pContext->segment[seg0_rel_idx].pData);
+	pContext->segment[seg0_rel_idx].pData = rel_config0_res;
+	pContext->pPhdr[seg0_rel_idx].p_filesz = rel_config_size0_res;
+	if(seg1_rel_idx >= 0){
+		free(pContext->segment[seg1_rel_idx].pData);
+		pContext->segment[seg1_rel_idx].pData = rel_config1_res;
+		pContext->pPhdr[seg1_rel_idx].p_filesz = rel_config_size1_res;
+	}
+
 	rel_config0_res = NULL;
 	rel_config1_res = NULL;
 
 	/*
-	 * Settings converted rel configs
+	 * Rebuild segment infos
 	 */
-	res = module_loader_search_elf_index(pContext, 0x60000000, 0);
-	if(res < 0)
-		res = module_loader_add_elf_entry(pContext, 0x60000000, 0);
-
-	if(res >= 0){
-
-		int idx = res;
-
-		pContext->pPhdr[idx].p_filesz = rel_config_size0;
-
-		if(pContext->pSegmentInfo[idx].compression == 2){
-
-			long unsigned int rel_config_size0_tmp = rel_config_size0 << 1;
+	for(int i=0;i<pContext->pEhdr->e_phnum;i++){
+		if(pContext->pPhdr[i].p_filesz != 0){
+			long unsigned int rel_config_size0_tmp = pContext->pPhdr[i].p_filesz << 1;
 			void *rel_config0_tmp = malloc(rel_config_size0_tmp);
 
-			compress(rel_config0_tmp, &rel_config_size0_tmp, rel_config0, rel_config_size0);
-			free(rel_config0);
-			rel_config0 = rel_config0_tmp;
-			rel_config_size0 = rel_config_size0_tmp;
+			compress(rel_config0_tmp, &rel_config_size0_tmp, pContext->segment[i].pData, pContext->pPhdr[i].p_filesz);
+
+			free(pContext->segment[i].pData);
+			pContext->segment[i].pData = rel_config0_tmp;
+			pContext->pSegmentInfo[i].length = rel_config_size0_tmp;
+			pContext->pSegmentInfo[i].compression = 2;
 		}
-
-		free(pContext->segment[idx].pData);
-		pContext->segment[idx].pData = rel_config0;
-		pContext->pSegmentInfo[idx].length = rel_config_size0;
-	}else{
-		free(rel_config0);
-		rel_config0 = NULL;
-	}
-
-	res = module_loader_search_elf_index(pContext, 0x60000000, 0x10000);
-	if(res < 0 && rel_config1 != NULL)
-		res = module_loader_add_elf_entry(pContext, 0x60000000, 0x10000);
-
-	if(res >= 0 && rel_config1 != NULL){
-
-		int idx = res;
-
-		pContext->pPhdr[idx].p_filesz = rel_config_size1;
-
-		if(pContext->pSegmentInfo[idx].compression == 2){
-
-			long unsigned int rel_config_size1_tmp = rel_config_size1 << 1;
-			void *rel_config1_tmp = malloc(rel_config_size1_tmp);
-
-			compress(rel_config1_tmp, &rel_config_size1_tmp, rel_config1, rel_config_size1);
-			free(rel_config1);
-			rel_config1 = rel_config1_tmp;
-			rel_config_size1 = rel_config_size1_tmp;
-		}
-
-		free(pContext->segment[idx].pData);
-		pContext->segment[idx].pData = rel_config1;
-		pContext->pSegmentInfo[idx].length = rel_config_size1;
-	}else{
-		free(rel_config1);
-		rel_config1 = NULL;
 	}
 
 	/*
@@ -329,16 +250,6 @@ module_close:
 	return 0;
 
 error:
-	if(rel_config0 != NULL){
-		free(rel_config0);
-		rel_config0 = NULL;
-	}
-
-	if(rel_config1 != NULL){
-		free(rel_config1);
-		rel_config1 = NULL;
-	}
-
 	if(rel_config0_res != NULL){
 		free(rel_config0_res);
 		rel_config0_res = NULL;
@@ -348,6 +259,9 @@ error:
 		free(rel_config1_res);
 		rel_config1_res = NULL;
 	}
+
+	rela_data_register_close(NULL, NULL);
+	rela_data_free();
 
 	module_loader_close(pContext);
 	pContext = NULL;

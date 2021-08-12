@@ -24,7 +24,7 @@ int rela_data_get_registered_num(void){
 	return rela_data_registered_num;
 }
 
-int rela_data_free(void){
+void rela_data_free(void){
 
 	SceRelaData *pRelaData = pRelaDataTop;
 	while(pRelaData != NULL){
@@ -43,11 +43,9 @@ int rela_data_free(void){
 	}
 
 	pRelaDataTop = NULL;
-
-	return 0;
 }
 
-int rela_data_show(void){
+void rela_data_show(void){
 
 	int rel_code_num = 0;
 	SceRelaData *pRelaData = pRelaDataTop;
@@ -66,8 +64,6 @@ int rela_data_show(void){
 	}
 
 	printf_d("rel code number=%d\n", rel_code_num);
-
-	return 0;
 }
 
 /*
@@ -92,12 +88,12 @@ int rela_data_search_by_symbol_address(uint32_t segment, uint32_t address, SceRe
 	return -1;
 }
 
-int rela_data_sort_symbol_by_target_address(void){
+void rela_data_sort_symbol_by_target_address(void){
 
 	SceRelaData *pRelaData = pRelaDataTop, *pRelaDataRestorePoint = NULL;
 
 	if(pRelaData == NULL)
-		return 0;
+		return;
 
 	while(pRelaData->next != NULL){
 		if(pRelaData->next->target_tree->target_address < pRelaData->target_tree->target_address){
@@ -133,17 +129,14 @@ int rela_data_sort_symbol_by_target_address(void){
 	}
 
 	pRelaDataTop = pRelaData;
-
-	return 0;
 }
 
 int rela_data_sort_target_by_target_address(SceRelaTarget **ppRelaTarget, int enable_out_rollback){
 
 	SceRelaTarget *pRelaTarget, *pRelaTargetRestorePoint;
 
-	if(ppRelaTarget == NULL){
+	if(ppRelaTarget == NULL)
 		return -1;
-	}
 
 	pRelaTargetRestorePoint = NULL;
 	pRelaTarget = *ppRelaTarget;
@@ -190,6 +183,16 @@ int rela_data_sort_target_by_target_address(SceRelaTarget **ppRelaTarget, int en
 	*ppRelaTarget = pRelaTarget;
 
 	return 0;
+}
+
+void rela_data_sort_all(void){
+
+	SceRelaData *pRelaData = pRelaDataTop;
+
+	while(pRelaData != NULL){
+		rela_data_sort_target_by_target_address(&pRelaData->target_tree, 1);
+		pRelaData = pRelaData->next;
+	}
 }
 
 #define SCE_RELA_ABS32_SORT_ENABLE (1)
@@ -320,18 +323,6 @@ int rela_data_get_lowest_entry_by_target(uint32_t segment, uint32_t address, Sce
 	return 0;
 }
 
-int rela_data_sort_all(void){
-
-	SceRelaData *pRelaData = pRelaDataTop;
-
-	while(pRelaData != NULL){
-		rela_data_sort_target_by_target_address(&pRelaData->target_tree, 1);
-		pRelaData = pRelaData->next;
-	}
-
-	return 0;
-}
-
 int rela_data_add_entry(
 	uint32_t target_segment, uint32_t offset_target,
 	uint32_t symbol_segment, uint32_t offset_symbol,
@@ -382,7 +373,6 @@ retry:
 			target_segment, offset_target,
 			type
 		);
-
 	}else{
 		pRelaData = malloc(sizeof(*pRelaData));
 		memset(pRelaData, 0, sizeof(*pRelaData));

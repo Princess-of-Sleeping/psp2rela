@@ -70,6 +70,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			rel_next_size = sizeof(SceRelInfoType0);
 
 			break;
+
 		case 1:
 			printf_t("type%d\n", _rel_info->type);
 
