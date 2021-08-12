@@ -20,6 +20,18 @@ Specify the `-src` and `-dst` arguments on the command line.
 
 Example : `./psp2rela -src=./input_module.self -dst=./output_module.self`
 
+You can specify the flag with `-flag=`.
+
+- `v`:Show more logs depending on the number. `1:error/2:warn/3:info/4:debug/5:trace`
+
+- `f`:Save the log to a file. The log file path can be specified with `-log_dst=`
+
+- `s`:Parses the rel config of the module specified by src and outputs it to the log. Also with this option, `-dst=` is ignored and only log output is available.
+
+Example : `./psp2rela -src=./input_module.self -dst=./output_module.self -flag=vvvf -log_dst=./log.txt`
+
+Specifying -dst = is optional, and if only -src = is used, only the conversion log will be output and the converted module will not be saved.
+
 # Information
 
 A. VitaSDK uses all type0.
