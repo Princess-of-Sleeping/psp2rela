@@ -85,19 +85,15 @@ int rela_data_convert(uint32_t segment){
 					current_target = target0->target_address;
 					target_segment = target0->target_segment;
 
-					if(target1 != NULL){
+					if(target1 != NULL && (target1->target_address - current_target) < (1 << 5)){
 						rel_type0 = target0->type;
 						rel_type1 = target1->type;
 						append_offset1 = target1->target_address - current_target;
 					}else{
-rel_first_type_none1:
 						rel_type0 = target0->type;
 						rel_type1 = R_ARM_NONE;
 						append_offset1 = 0;
 					}
-
-					if(append_offset1 >= (1 << 5))
-						goto rel_first_type_none1;
 
 					if(rel_type1 != R_ARM_NONE || (current_target >= (1 << 22) || current_symbol >= (1 << 22))){
 						res = rela_data_register_write_type0(
@@ -269,7 +265,6 @@ rel_first_type_none1:
 				}
 
 				use_first_type = 1;
-				target_tree = target0->next;
 			}
 		}
 	} while(pRelaData != NULL);
