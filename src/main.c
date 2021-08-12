@@ -118,6 +118,12 @@ int main(int argc, char *argv[]){
 		goto error;
 	}
 
+	res = rela_data_sort_symbol_by_target_address();
+	if(res < 0){
+		printf("%s failed in %s segment %d\n", "rela_data_sort_symbol_by_target_address", "text", 0);
+		goto error;
+	}
+
 	res = rela_data_sort_all();
 	if(res < 0){
 		printf("%s failed in %s segment %d\n", "rela_data_sort_all", "text", 0);
@@ -125,6 +131,20 @@ int main(int argc, char *argv[]){
 	}
 
 	if(rela_is_show_mode() != 0){
+		printf_i("\n");
+		printf_i("Text segment\n\n");
+
+		rela_data_show();
+		rela_data_free();
+
+		rela_regiser_entrys(rel_config0, rel_config_size0, 1); // Register to split the merged config of vitasdk
+		rela_regiser_entrys(rel_config1, rel_config_size1, 1);
+		rela_data_sort_symbol_by_target_address();
+		rela_data_sort_all();
+
+		printf_i("\n");
+		printf_i("Data segment\n\n");
+
 		rela_data_show();
 		rela_data_free();
 
@@ -175,6 +195,12 @@ int main(int argc, char *argv[]){
 	res = rela_regiser_entrys(rel_config1, rel_config_size1, 1);
 	if(res < 0){
 		printf("%s failed in %s segment %d\n", "rela_regiser_entrys", "data", 1);
+		goto error;
+	}
+
+	res = rela_data_sort_symbol_by_target_address();
+	if(res < 0){
+		printf("%s failed in %s segment %d\n", "rela_data_sort_symbol_by_target_address", "data", 0);
 		goto error;
 	}
 

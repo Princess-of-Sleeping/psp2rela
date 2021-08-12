@@ -31,16 +31,19 @@ int rela_data_register_open(void){
 
 int rela_data_register_close(void **ppRelaDataResult, int *pResultSize){
 
-	if(ppRelaDataResult == NULL || pResultSize == NULL)
-		return -2;
-
 	if(rela_data_is_register == 0)
 		return -1;
 
 	rela_data_is_register = 0;
 
-	*ppRelaDataResult = rela_data_pool;
-	*pResultSize      = rela_data_write_size;
+	if(ppRelaDataResult == NULL){
+		free(rela_data_pool);
+	}else{
+		*ppRelaDataResult = rela_data_pool;
+	}
+
+	if(pResultSize != NULL)
+		*pResultSize      = rela_data_write_size;
 
 	rela_data_write_size = 0;
 	rela_data_pool       = NULL;
