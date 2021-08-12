@@ -17,7 +17,7 @@ int module_loader_close(ModuleLoaderContext *pContext){
 		return -1;
 	}
 
-	for(int i=0;i<5;i++){
+	for(int i=0;i<pContext->pEhdr->e_phnum;i++){
 		if(pContext->segment[i].pData != NULL)
 			free(pContext->segment[i].pData);
 	}
@@ -53,9 +53,6 @@ int module_loader_add_elf_entry(ModuleLoaderContext *pContext, int type, int fla
 
 	if(pContext == NULL)
 		return -1;
-
-	if(pContext->pEhdr->e_phnum == 5)
-		return -3;
 
 	res = module_loader_search_elf_index(pContext, type, flags);
 	if(res >= 0)
