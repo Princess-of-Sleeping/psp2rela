@@ -136,6 +136,8 @@ int rela_do_relocation(ModuleLoaderContext *pContext){
 		printf_i("segment %d new vaddr : 0x%08X(0x%08X)\n", segment_num, vaddr, moduleInfoInternal.segments[segment_num].memsz);
 	}
 
+	printf_i("\n");
+
 	res = 0;
 
 	if(res == 0 && seg0_rel_idx >= 0)
@@ -197,11 +199,16 @@ int main(int argc, char *argv[]){
 	}
 
 #if defined(RELA_PRE_RELOCATION) && RELA_PRE_RELOCATION != 0
+
+	printf_d("Pre-relocation ...\n");
+
 	res = rela_do_relocation(pContext);
 	if(res < 0){
 		printf_e("rela_do_relocation failed : 0x%X\n", res);
 		goto error;
 	}
+
+	printf_d("Pre-relocation ... ok\n\n");
 #endif
 
 	void *rel_config0 = NULL, *rel_config1 = NULL, *rel_config0_res = NULL, *rel_config1_res = NULL;
