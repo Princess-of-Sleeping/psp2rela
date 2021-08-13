@@ -15,6 +15,10 @@
 SceRelaData *pRelaDataTop = NULL;
 int rela_data_registered_num = 0;
 
+SceRelaData *rela_data_get_tree_top(void){
+	return pRelaDataTop;
+}
+
 int rela_data_set_registered_num(int new){
 	int old = rela_data_registered_num;
 	rela_data_registered_num = new;
@@ -64,7 +68,7 @@ void rela_data_show(void){
 		pRelaData = pRelaData->next;
 	}
 
-	printf_d("rel code number=%d\n", rel_code_num);
+	printf_i("rel code number=%d\n", rel_code_num);
 }
 
 /*
@@ -294,30 +298,6 @@ int rela_data_split_abs32(uint32_t segment, SceRelaTarget **ppRelaTarget){
 
 end:
 	*ppRelaTarget = target_tree_current;
-
-	return 0;
-}
-
-int rela_data_get_lowest_entry_by_target(uint32_t segment, uint32_t address, SceRelaData **ppRelaData){
-
-	uint32_t cache_address = ~0;
-	SceRelaData *pRelaData = pRelaDataTop;
-
-	if(ppRelaData == NULL)
-		return -1;
-
-	*ppRelaData = NULL;
-
-	while(pRelaData != NULL){
-		if(pRelaData->target_tree != NULL && pRelaData->target_tree->target_segment == segment){
-			if(address < pRelaData->target_tree->target_address && cache_address > pRelaData->target_tree->target_address){
-				cache_address = pRelaData->target_tree->target_address;
-				*ppRelaData = pRelaData;
-			}
-		}
-
-		pRelaData = pRelaData->next;
-	}
 
 	return 0;
 }
