@@ -183,7 +183,7 @@ int main(int argc, char *argv[]){
 		if(pContext->pSegmentInfo[i].compression == 2 && pContext->pPhdr[i].p_filesz != 0){
 
 			long unsigned int temp_size = pContext->pPhdr[i].p_filesz;
-			void *temp_memory_ptr = malloc(pContext->pPhdr[i].p_filesz);
+			void *temp_memory_ptr = malloc(temp_size);
 
 			res = uncompress(temp_memory_ptr, &temp_size, pContext->segment[i].pData, pContext->pSegmentInfo[i].length);
 			if(res != Z_OK){
