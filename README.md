@@ -44,7 +44,7 @@ type0 is 12-bytes, type1 is 8-bytes.
 
 This tool should work well with the A and B SDKs and reduce the module size.
 
-The ones created with the C SDK are already fully optimized as they are already using all types. Therefore, using this tool does not give effective expectations.
+The ones created in the C SDK are already fully optimized because they are already using all types, but this tool may be able to further compress the rel config.
 
 ### TODO
 
