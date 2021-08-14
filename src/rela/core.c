@@ -79,7 +79,7 @@ int rela_data_checksum_update(uint32_t *pChecksum, const SceRelaTarget *pTarget)
 	return 0;
 }
 
-void rela_data_calc_checksum(void){
+void rela_data_calc_checksum(uint32_t *pChecksum){
 
 	uint32_t checksum = 0;
 
@@ -95,7 +95,11 @@ void rela_data_calc_checksum(void){
 		pRelaData = pRelaData->next;
 	}
 
-	printf_i("checksum=0x%08X\n", checksum);
+	if(pChecksum == NULL){
+		printf_i("checksum=0x%08X\n", checksum);
+	}else{
+		*pChecksum = checksum;
+	}
 }
 
 void rela_data_free(void){

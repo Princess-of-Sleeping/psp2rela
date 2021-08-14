@@ -23,7 +23,7 @@
 const char *segment_area[] = {"text", "data"};
 
 int rela_data_convert_helper(
-	uint32_t segment,
+	uint32_t *pChecksum, uint32_t segment,
 	const void *rel_config0, int rel_config_size0,
 	const void *rel_config1, int rel_config_size1,
 	void **rel_config_res, int *rel_config_size_res
@@ -46,7 +46,7 @@ int rela_data_convert_helper(
 	rela_data_sort_all();
 	rela_data_sort_symbol_by_target_address();
 
-	rela_data_calc_checksum();
+	rela_data_calc_checksum(pChecksum);
 
 	res = rela_data_register_open();
 	if(res < 0){
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]){
 		printf_i("\n");
 		printf_i("Text segment\n\n");
 
-		rela_data_calc_checksum();
+		rela_data_calc_checksum(NULL);
 		rela_data_show();
 		rela_data_free();
 
@@ -264,17 +264,19 @@ int main(int argc, char *argv[]){
 		printf_i("\n");
 		printf_i("Data segment\n\n");
 
-		rela_data_calc_checksum();
+		rela_data_calc_checksum(NULL);
 		rela_data_show();
 		rela_data_free();
 
 		goto module_close;
 	}
 
+	uint32_t checksum_org0, checksum_org1;
+
 	/*
 	 * Convert segment rel config
 	 */
-	res = rela_data_convert_helper(0, rel_config0, rel_config_size0, rel_config1, rel_config_size1, &rel_config0_res, &rel_config_size0_res);
+	res = rela_data_convert_helper(&checksum_org0, 0, rel_config0, rel_config_size0, rel_config1, rel_config_size1, &rel_config0_res, &rel_config_size0_res);
 	if(res < 0){
 		printf("%s failed in %s segment %d\n", "rela_data_convert_helper", "text", 0);
 		goto error;
@@ -283,7 +285,7 @@ int main(int argc, char *argv[]){
 	printf_i("Text segment rel config size : 0x%X\n", rel_config_size0_res);
 	printf_i("\n");
 
-	res = rela_data_convert_helper(1, rel_config0, rel_config_size0, rel_config1, rel_config_size1, &rel_config1_res, &rel_config_size1_res);
+	res = rela_data_convert_helper(&checksum_org1, 1, rel_config0, rel_config_size0, rel_config1, rel_config_size1, &rel_config1_res, &rel_config_size1_res);
 	if(res < 0){
 		printf("%s failed in %s segment %d\n", "rela_data_convert_helper", "data", 0);
 		goto error;
@@ -305,10 +307,57 @@ int main(int argc, char *argv[]){
 	free(pContext->segment[seg0_rel_idx].pData);
 	pContext->segment[seg0_rel_idx].pData = rel_config0_res;
 	pContext->pPhdr[seg0_rel_idx].p_filesz = rel_config_size0_res;
+
+#if defined(RELA_ENABLE_CHECKSUM) && RELA_ENABLE_CHECKSUM != 0
+
+	printf_i("\nsegment %d rel config checksum ...\n", 0);
+
+	rela_regiser_entrys(rel_config0_res, rel_config_size0_res, 0);
+	rela_data_sort_all();
+	rela_data_sort_symbol_by_target_address();
+	rel_config0_res = NULL;
+	rel_config_size0_res = 0;
+
+	uint32_t checksum_new0;
+	rela_data_calc_checksum(&checksum_new0);
+
+	rela_data_free();
+
+	if(checksum_org0 != checksum_new0){
+		printf_e("Segment 0 checksum = 0x%08X/0x%08X\n", checksum_org0, checksum_new0);
+		goto error;
+	}
+
+	printf_i("segment %d rel config checksum ... ok\n", 0);
+#endif
+
 	if(seg1_rel_idx >= 0){
 		free(pContext->segment[seg1_rel_idx].pData);
 		pContext->segment[seg1_rel_idx].pData = rel_config1_res;
 		pContext->pPhdr[seg1_rel_idx].p_filesz = rel_config_size1_res;
+
+#if defined(RELA_ENABLE_CHECKSUM) && RELA_ENABLE_CHECKSUM != 0
+
+		printf_i("\nsegment %d rel config checksum ...\n", 1);
+
+		rela_regiser_entrys(rel_config1_res, rel_config_size1_res, 1);
+		rela_data_sort_all();
+		rela_data_sort_symbol_by_target_address();
+		rel_config1_res = NULL;
+		rel_config_size1_res = 0;
+
+		uint32_t checksum_new1;
+		rela_data_calc_checksum(&checksum_new1);
+
+		rela_data_free();
+
+		if(checksum_org1 != checksum_new1){
+			printf_e("Segment 0 checksum = 0x%08X/0x%08X\n", checksum_org0, checksum_new0);
+			goto error;
+		}
+
+		printf_i("segment %d rel config checksum ... ok\n", 1);
+#endif
 	}
 
 	rel_config0_res = NULL;
