@@ -182,6 +182,11 @@ int main(int argc, char *argv[]){
 	printf_d("module open success\n");
 
 	for(int i=0;i<pContext->pEhdr->e_phnum;i++){
+
+#if defined(RELA_USE_DEFAULT_ALIGN_SIZE) && RELA_USE_DEFAULT_ALIGN_SIZE != 0
+		if(pContext->pPhdr[i].p_align == 0x1000)
+			pContext->pPhdr[i].p_align = 0x10;
+#endif
 		if(pContext->pSegmentInfo[i].compression == 2 && pContext->pPhdr[i].p_filesz != 0){
 
 			long unsigned int temp_size = pContext->pPhdr[i].p_filesz;
