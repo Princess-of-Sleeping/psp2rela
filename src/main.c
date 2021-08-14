@@ -318,7 +318,14 @@ int main(int argc, char *argv[]){
 			long unsigned int rel_config_size0_tmp = (pContext->pPhdr[i].p_filesz << 1) + 12;
 			void *rel_config0_tmp = malloc(rel_config_size0_tmp);
 
-			compress(rel_config0_tmp, &rel_config_size0_tmp, pContext->segment[i].pData, pContext->pPhdr[i].p_filesz);
+			res = compress(rel_config0_tmp, &rel_config_size0_tmp, pContext->segment[i].pData, pContext->pPhdr[i].p_filesz);
+			if(res != Z_OK){
+				printf_e("zlib compress failed : 0x%X\n", res);
+				printf_e("\telf segment %d\n", i);
+				printf_e("\tsegment file size 0x%X\n", pContext->pPhdr[i].p_filesz);
+				free(rel_config0_tmp);
+				goto error;
+			}
 
 			free(pContext->segment[i].pData);
 			pContext->segment[i].pData = rel_config0_tmp;
