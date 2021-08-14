@@ -43,8 +43,8 @@ int rela_data_convert_helper(
 		return res;
 	}
 
-	rela_data_sort_symbol_by_target_address();
 	rela_data_sort_all();
+	rela_data_sort_symbol_by_target_address();
 
 	res = rela_data_register_open();
 	if(res < 0){
@@ -244,8 +244,8 @@ int main(int argc, char *argv[]){
 	if(rela_is_show_mode() != 0){
 		rela_regiser_entrys(rel_config0, rel_config_size0, 0);
 		rela_regiser_entrys(rel_config1, rel_config_size1, 0); // Register to split the merged config of vitasdk
-		rela_data_sort_symbol_by_target_address();
 		rela_data_sort_all();
+		rela_data_sort_symbol_by_target_address();
 
 		printf_i("\n");
 		printf_i("Text segment\n\n");
@@ -255,8 +255,8 @@ int main(int argc, char *argv[]){
 
 		rela_regiser_entrys(rel_config0, rel_config_size0, 1); // Register to split the merged config of vitasdk
 		rela_regiser_entrys(rel_config1, rel_config_size1, 1);
-		rela_data_sort_symbol_by_target_address();
 		rela_data_sort_all();
+		rela_data_sort_symbol_by_target_address();
 
 		printf_i("\n");
 		printf_i("Data segment\n\n");

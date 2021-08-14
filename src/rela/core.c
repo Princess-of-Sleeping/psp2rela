@@ -114,11 +114,11 @@ void rela_data_sort_symbol_by_target_address(void){
 			pRelaData->next->symbol_address = tmp.symbol_address;
 			pRelaData->next->target_tree    = tmp.target_tree;
 
-			if(pRelaDataRestorePoint == NULL)
-				pRelaDataRestorePoint = pRelaData;
-
 			if(pRelaData->prev != NULL)
 				pRelaData = pRelaData->prev;
+
+			if(pRelaDataRestorePoint == NULL)
+				pRelaDataRestorePoint = pRelaData;
 		}else{
 			if(pRelaDataRestorePoint != NULL){
 				pRelaData = pRelaDataRestorePoint;
@@ -163,12 +163,11 @@ int rela_data_sort_target_by_target_address(SceRelaTarget **ppRelaTarget, int en
 			pRelaTarget->next->target_address = tmp.target_address;
 			pRelaTarget->next->type           = tmp.type;
 
-			if(pRelaTargetRestorePoint == NULL)
-				pRelaTargetRestorePoint = pRelaTarget;
-
 			if(pRelaTarget->prev != NULL)
 				pRelaTarget = pRelaTarget->prev;
 
+			if(pRelaTargetRestorePoint == NULL)
+				pRelaTargetRestorePoint = pRelaTarget;
 		}else{
 			if(pRelaTargetRestorePoint != NULL){
 				pRelaTarget = pRelaTargetRestorePoint;
