@@ -189,7 +189,10 @@ int main(int argc, char *argv[]){
 
 			res = uncompress(temp_memory_ptr, &temp_size, pContext->segment[i].pData, pContext->pSegmentInfo[i].length);
 			if(res != Z_OK){
-				printf("zlib uncompress failed : 0x%X\n", res);
+				printf_e("zlib uncompress failed : 0x%X\n", res);
+				printf_e("\telf segment %d\n", i);
+				printf_e("\tsegment file size 0x%X\n", pContext->pPhdr[i].p_filesz);
+				free(temp_memory_ptr);
 				goto error;
 			}
 
@@ -307,7 +310,7 @@ int main(int argc, char *argv[]){
 	 */
 	for(int i=0;i<pContext->pEhdr->e_phnum;i++){
 		if(pContext->pPhdr[i].p_filesz != 0){
-			long unsigned int rel_config_size0_tmp = pContext->pPhdr[i].p_filesz << 1;
+			long unsigned int rel_config_size0_tmp = (pContext->pPhdr[i].p_filesz << 1) + 12;
 			void *rel_config0_tmp = malloc(rel_config_size0_tmp);
 
 			compress(rel_config0_tmp, &rel_config_size0_tmp, pContext->segment[i].pData, pContext->pPhdr[i].p_filesz);
