@@ -46,6 +46,8 @@ int rela_data_convert_helper(
 	rela_data_sort_all();
 	rela_data_sort_symbol_by_target_address();
 
+	rela_data_calc_checksum();
+
 	res = rela_data_register_open();
 	if(res < 0){
 		printf("%s failed in %s segment %d\n", "rela_data_register_open", segment_area[segment], 0);
@@ -250,6 +252,7 @@ int main(int argc, char *argv[]){
 		printf_i("\n");
 		printf_i("Text segment\n\n");
 
+		rela_data_calc_checksum();
 		rela_data_show();
 		rela_data_free();
 
@@ -261,6 +264,7 @@ int main(int argc, char *argv[]){
 		printf_i("\n");
 		printf_i("Data segment\n\n");
 
+		rela_data_calc_checksum();
 		rela_data_show();
 		rela_data_free();
 

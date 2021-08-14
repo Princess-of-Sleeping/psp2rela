@@ -33,6 +33,7 @@ void rela_data_free(void);
 void rela_data_show(void);
 void rela_data_sort_all(void);
 void rela_data_sort_symbol_by_target_address(void);
+void rela_data_calc_checksum(void);
 
 int rela_data_search_by_symbol_address(uint32_t segment, uint32_t address, SceRelaData **ppRelaData);
 int rela_data_split_abs32(uint32_t segment, SceRelaTarget **ppRelaTarget);

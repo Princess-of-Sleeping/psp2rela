@@ -29,6 +29,75 @@ int rela_data_get_registered_num(void){
 	return rela_data_registered_num;
 }
 
+uint32_t rela_data_checksum_update_internal(uint32_t checksum, const SceRelaTarget *pTarget, int a3){
+
+	checksum += ((a3 == 0) ? pTarget->target_address : pTarget->symbol_address);
+	checksum += ((a3 == 0) ? pTarget->target_segment : pTarget->symbol_segment);
+
+	return checksum;
+}
+
+int rela_data_checksum_update(uint32_t *pChecksum, const SceRelaTarget *pTarget){
+
+	if(pChecksum == NULL || pTarget == NULL)
+		return -1;
+
+	uint32_t checksum = *pChecksum;
+
+	checksum = rela_data_checksum_update_internal(checksum, pTarget, 0);
+
+	switch(pTarget->type){
+	case R_ARM_NONE:
+	case R_ARM_V4BX:
+		break;
+	case R_ARM_ABS32:
+	case R_ARM_TARGET1:
+		break;
+	case R_ARM_REL32:
+	case R_ARM_TARGET2:
+		break;
+	case R_ARM_THM_CALL:
+		break;
+	case R_ARM_CALL:
+		break;
+	case R_ARM_JUMP24:
+		break;
+	case R_ARM_PREL31:
+		break;
+	case R_ARM_MOVW_ABS_NC:
+	case R_ARM_MOVT_ABS:
+	case R_ARM_THM_MOVW_ABS_NC:
+	case R_ARM_THM_MOVT_ABS:
+		checksum = rela_data_checksum_update_internal(checksum, pTarget, 1);
+		break;
+	default:
+		return -1;
+	}
+
+	*pChecksum = checksum;
+
+	return 0;
+}
+
+void rela_data_calc_checksum(void){
+
+	uint32_t checksum = 0;
+
+	SceRelaData *pRelaData = pRelaDataTop;
+	while(pRelaData != NULL){
+
+		SceRelaTarget *target_tree = pRelaData->target_tree;
+		while(target_tree != NULL){
+			rela_data_checksum_update(&checksum, target_tree);
+			target_tree = target_tree->next;
+		}
+
+		pRelaData = pRelaData->next;
+	}
+
+	printf_i("checksum=0x%08X\n", checksum);
+}
+
 void rela_data_free(void){
 
 	SceRelaData *pRelaData = pRelaDataTop;
