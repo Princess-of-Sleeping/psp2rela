@@ -324,7 +324,7 @@ int main(int argc, char *argv[]){
 	rela_data_free();
 
 	if(checksum_org0 != checksum_new0){
-		printf_e("Segment 0 checksum = 0x%08X/0x%08X\n", checksum_org0, checksum_new0);
+		printf_e("Segment %d checksum is mismatch = 0x%08X/0x%08X\n", 0, checksum_org0, checksum_new0);
 		goto error;
 	}
 
@@ -352,7 +352,7 @@ int main(int argc, char *argv[]){
 		rela_data_free();
 
 		if(checksum_org1 != checksum_new1){
-			printf_e("Segment 0 checksum = 0x%08X/0x%08X\n", checksum_org0, checksum_new0);
+			printf_e("Segment %d checksum is mismatch = 0x%08X/0x%08X\n", 1, checksum_org1, checksum_new1);
 			goto error;
 		}
 
@@ -402,6 +402,8 @@ module_close:
 	return 0;
 
 error:
+	printf_e("The process was aborted due to an error\n");
+
 	if(rel_config0_res != NULL){
 		free(rel_config0_res);
 		rel_config0_res = NULL;
