@@ -49,6 +49,6 @@ The ones created in the C SDK are already fully optimized because they are alrea
 ### TODO
 
 - [ ] Check the validity of the module more.
-- [ ] Optimize code more
+- [x] Optimize code more
 
 It has been tested with some modules, but it may still be buggy and not working. In that case, please open issues.
