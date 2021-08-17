@@ -189,7 +189,7 @@ int main(int argc, char *argv[]){
 		if(pContext->pPhdr[i].p_align == 0x1000)
 			pContext->pPhdr[i].p_align = 0x10;
 #endif
-		if(pContext->pSegmentInfo[i].compression == 2 && pContext->pPhdr[i].p_filesz != 0){
+		if(module_loader_is_elf(pContext) == 0 && pContext->pSegmentInfo[i].compression == 2 && pContext->pPhdr[i].p_filesz != 0){
 
 			long unsigned int temp_size = pContext->pPhdr[i].p_filesz;
 			void *temp_memory_ptr = malloc(temp_size);
@@ -367,7 +367,7 @@ int main(int argc, char *argv[]){
 	 * Rebuild segment infos
 	 */
 	for(int i=0;i<pContext->pEhdr->e_phnum;i++){
-		if(pContext->pPhdr[i].p_filesz != 0){
+		if(module_loader_is_elf(pContext) == 0 && pContext->pPhdr[i].p_filesz != 0){
 			long unsigned int rel_config_size0_tmp = (pContext->pPhdr[i].p_filesz << 1) + 12;
 			void *rel_config0_tmp = malloc(rel_config_size0_tmp);
 

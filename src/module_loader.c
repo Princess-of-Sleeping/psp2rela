@@ -87,11 +87,18 @@ int module_loader_add_elf_entry(ModuleLoaderContext *pContext, int type, int fla
 	return i;
 }
 
+int module_loader_is_elf(const ModuleLoaderContext *pContext){
+	return pContext->is_elf != 0;
+}
+
 int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 
 	int fd, readbyte;
 	void         *pHeader      = NULL;
+	cf_header_t  *pCfHeader    = NULL;
+	ext_header   *pExtHeader   = NULL;
 	SCE_appinfo  *pAppInfo     = NULL;
+	Elf32_Ehdr   *pEhdr        = NULL;
 	Elf32_Phdr   *pPhdr        = NULL;
 	segment_info *pSegmentInfo = NULL;
 	SCE_version  *pVersion     = NULL;
@@ -120,125 +127,212 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 
 	readbyte = read(fd, &cf_header, sizeof(cf_header));
 
-	if(readbyte != sizeof(cf_header) || cf_header.base.m_magic != 0x454353){
-		printf_e("This self is not SCE self\n");
+	if(readbyte != sizeof(cf_header)){
+		printf_e("File read error\n");
 		goto error;
 	}
 
-	if(cf_header.base.m_version != 3){
-		printf_e("This self is not version 3\n");
-		goto error;
-	}
-
-	if(cf_header.header_v3.m_certified_file_size > 0x10000000){
-		printf_e("This self is too big\n");
-		printf_e("Can't processing\n");
-		goto error;
-	}
-
-	if(cf_header.header_v3.m_header_length > 0x1000){
-		printf_e("This header is too big\n");
-		printf_e("Can't processing\n");
+	if(cf_header.base.m_magic != 0x454353 && cf_header.base.m_magic != 0x464C457F){
+		printf_e("This self is not SCE self/elf\n");
 		goto error;
 	}
 
 	int is_elf = cf_header.base.m_magic == 0x464C457F; // TODO:support raw elf
 
-	pHeader = malloc(cf_header.header_v3.m_header_length);
-	if(pHeader == NULL){
-		printf_e("Cannot allocate memory for self header\n");
-		goto error;
-	}
-
-	lseek(fd, 0, SEEK_SET);
-	readbyte = read(fd, pHeader, cf_header.header_v3.m_header_length);
-
-	if(readbyte != cf_header.header_v3.m_header_length){
-		printf_e("self header : readbyte != cf_header.header_v3.m_header_length\n");
-		goto error;
-	}
-
-	void *current_ptr = pHeader;
-
-	cf_header_t *pCfHeader = (cf_header_t *)current_ptr;
-	current_ptr = (void *)(((uintptr_t)current_ptr) + sizeof(cf_header_t));
-
-	ext_header *pExtHeader = (ext_header *)current_ptr;
-	current_ptr = (void *)(((uintptr_t)current_ptr) + sizeof(ext_header));
-
-	pAppInfo = (SCE_appinfo *)malloc(sizeof(SCE_appinfo));
-	if(pAppInfo == NULL){
-		printf_e("Cannot allocate memory\n");
-		goto error;
-	}
-
-	memcpy(pAppInfo, (SCE_appinfo *)((uintptr_t)pHeader + pExtHeader->appinfo_offset), sizeof(SCE_appinfo));
-
-	Elf32_Ehdr *pEhdr = (Elf32_Ehdr *)((uintptr_t)pHeader + pExtHeader->elf_offset);
-
-	pPhdr = (Elf32_Phdr *)malloc(sizeof(Elf32_Phdr) * pEhdr->e_phnum);
-	if(pPhdr == NULL){
-		printf_e("Cannot allocate memory\n");
-		goto error;
-	}
-
-	memcpy(pPhdr, (Elf32_Phdr *)((uintptr_t)pHeader + pExtHeader->phdr_offset), sizeof(Elf32_Phdr) * pEhdr->e_phnum);
-
-	pSegmentInfo = (segment_info *)malloc(sizeof(segment_info) * pEhdr->e_phnum);
-	if(pSegmentInfo == NULL){
-		printf_e("Cannot allocate memory\n");
-		goto error;
-	}
-
-	memcpy(pSegmentInfo, (segment_info *)((uintptr_t)pHeader + pExtHeader->section_info_offset), sizeof(Elf32_Phdr) * pEhdr->e_phnum);
-
-	pVersion = (SCE_version *)malloc(sizeof(SCE_version));
-	if(pVersion == NULL){
-		printf_e("Cannot allocate memory\n");
-		goto error;
-	}
-
-	memcpy(pVersion, (SCE_version *)((uintptr_t)pHeader + pExtHeader->sceversion_offset), sizeof(SCE_version));
-
-	pControlInfo = malloc(pExtHeader->controlinfo_size);
-	if(pControlInfo == NULL){
-		printf_e("Cannot allocate memory\n");
-		goto error;
-	}
-
-	memcpy(pControlInfo, (void *)((uintptr_t)pHeader + pExtHeader->controlinfo_offset), pExtHeader->controlinfo_size);
-
-	printf_d("elf segments info\n");
-	printf_d("segment num : 0x%X\n", pEhdr->e_phnum);
-
-	for(int i=0;i<pEhdr->e_phnum;i++){
-		printf_d("[%d] type  :0x%08X offset:0x%08X vaddr:0x%08X paddr:0x%08X\n",
-			i,
-			pPhdr[i].p_type,
-			pPhdr[i].p_offset,
-			pPhdr[i].p_vaddr,
-			pPhdr[i].p_paddr
-		);
-		printf_d("    filesz:0x%08X memsz :0x%08X flags:0x%08X align:0x%08X\n",
-			pPhdr[i].p_filesz,
-			pPhdr[i].p_memsz,
-			pPhdr[i].p_flags,
-			pPhdr[i].p_align
-		);
-		printf_d("offset=0x%08lX length=0x%08lX compression=%ld encryption=%ld\n", pSegmentInfo[i].offset, pSegmentInfo[i].length, pSegmentInfo[i].compression, pSegmentInfo[i].encryption);
-
-		context.segment[i].pData = malloc(pSegmentInfo[i].length);
-		context.segment[i].memsz = pSegmentInfo[i].length;
-		if(context.segment[i].pData == NULL){
-			printf_e("Cannot allocate memory for segment\n");
+	if(is_elf == 0){
+		if(cf_header.base.m_version != 3){
+			printf_e("This self is not version 3\n");
 			goto error;
 		}
 
-		lseek(fd, pSegmentInfo[i].offset, SEEK_SET);
-		readbyte = read(fd, context.segment[i].pData, pSegmentInfo[i].length);
-		if(readbyte != pSegmentInfo[i].length){
-			printf_e("segment read error = 0x%X\n", readbyte);
+		if(cf_header.header_v3.m_certified_file_size > 0x10000000){
+			printf_e("This self is too big\n");
+			printf_e("Can't processing\n");
 			goto error;
+		}
+
+		if(cf_header.header_v3.m_header_length > 0x1000){
+			printf_e("This header is too big\n");
+			printf_e("Can't processing\n");
+			goto error;
+		}
+
+		pHeader = malloc(cf_header.header_v3.m_header_length);
+		if(pHeader == NULL){
+			printf_e("Cannot allocate memory for self header\n");
+			goto error;
+		}
+
+		lseek(fd, 0, SEEK_SET);
+		readbyte = read(fd, pHeader, cf_header.header_v3.m_header_length);
+
+		if(readbyte != cf_header.header_v3.m_header_length){
+			printf_e("self header : readbyte != cf_header.header_v3.m_header_length\n");
+			goto error;
+		}
+
+		void *current_ptr = pHeader;
+
+		pCfHeader = (cf_header_t *)current_ptr;
+		current_ptr = (void *)(((uintptr_t)current_ptr) + sizeof(cf_header_t));
+
+		pExtHeader = (ext_header *)current_ptr;
+		current_ptr = (void *)(((uintptr_t)current_ptr) + sizeof(ext_header));
+
+		pAppInfo = (SCE_appinfo *)malloc(sizeof(SCE_appinfo));
+		if(pAppInfo == NULL){
+			printf_e("Cannot allocate memory\n");
+			goto error;
+		}
+
+		memcpy(pAppInfo, (SCE_appinfo *)((uintptr_t)pHeader + pExtHeader->appinfo_offset), sizeof(SCE_appinfo));
+
+		pEhdr = (Elf32_Ehdr *)((uintptr_t)pHeader + pExtHeader->elf_offset);
+
+		pPhdr = (Elf32_Phdr *)malloc(sizeof(Elf32_Phdr) * pEhdr->e_phnum);
+		if(pPhdr == NULL){
+			printf_e("Cannot allocate memory\n");
+			goto error;
+		}
+
+		memcpy(pPhdr, (Elf32_Phdr *)((uintptr_t)pHeader + pExtHeader->phdr_offset), sizeof(Elf32_Phdr) * pEhdr->e_phnum);
+
+		pSegmentInfo = (segment_info *)malloc(sizeof(segment_info) * pEhdr->e_phnum);
+		if(pSegmentInfo == NULL){
+			printf_e("Cannot allocate memory\n");
+			goto error;
+		}
+
+		memcpy(pSegmentInfo, (segment_info *)((uintptr_t)pHeader + pExtHeader->section_info_offset), sizeof(Elf32_Phdr) * pEhdr->e_phnum);
+
+		pVersion = (SCE_version *)malloc(sizeof(SCE_version));
+		if(pVersion == NULL){
+			printf_e("Cannot allocate memory\n");
+			goto error;
+		}
+
+		memcpy(pVersion, (SCE_version *)((uintptr_t)pHeader + pExtHeader->sceversion_offset), sizeof(SCE_version));
+
+		pControlInfo = malloc(pExtHeader->controlinfo_size);
+		if(pControlInfo == NULL){
+			printf_e("Cannot allocate memory\n");
+			goto error;
+		}
+
+		memcpy(pControlInfo, (void *)((uintptr_t)pHeader + pExtHeader->controlinfo_offset), pExtHeader->controlinfo_size);
+
+		printf_d("elf segments info\n");
+		printf_d("segment num : 0x%X\n", pEhdr->e_phnum);
+
+		for(int i=0;i<pEhdr->e_phnum;i++){
+			printf_d("[%d] type  :0x%08X offset:0x%08X vaddr:0x%08X paddr:0x%08X\n",
+				i,
+				pPhdr[i].p_type,
+				pPhdr[i].p_offset,
+				pPhdr[i].p_vaddr,
+				pPhdr[i].p_paddr
+			);
+			printf_d("    filesz:0x%08X memsz :0x%08X flags:0x%08X align:0x%08X\n",
+				pPhdr[i].p_filesz,
+				pPhdr[i].p_memsz,
+				pPhdr[i].p_flags,
+				pPhdr[i].p_align
+			);
+			printf_d("offset=0x%08lX length=0x%08lX compression=%ld encryption=%ld\n", pSegmentInfo[i].offset, pSegmentInfo[i].length, pSegmentInfo[i].compression, pSegmentInfo[i].encryption);
+
+			context.segment[i].pData = malloc(pSegmentInfo[i].length);
+			context.segment[i].memsz = pSegmentInfo[i].length;
+			if(context.segment[i].pData == NULL){
+				printf_e("Cannot allocate memory for segment\n");
+				goto error;
+			}
+
+			lseek(fd, pSegmentInfo[i].offset, SEEK_SET);
+			readbyte = read(fd, context.segment[i].pData, pSegmentInfo[i].length);
+			if(readbyte != pSegmentInfo[i].length){
+				printf_e("segment read error = 0x%X\n", readbyte);
+				goto error;
+			}
+		}
+	}else{
+		printf_i("elf mode\n");
+
+		pHeader = malloc(0x34);
+		if(pHeader == NULL){
+			printf_e("Cannot allocate memory for self header\n");
+			goto error;
+		}
+
+		lseek(fd, 0, SEEK_SET);
+		readbyte = read(fd, pHeader, 0x34);
+		if(readbyte != 0x34){
+			printf_e("elf header read error = 0x%X\n", readbyte);
+			goto error;
+		}
+
+		pEhdr = pHeader;
+
+		if(pEhdr->e_type != 0xFE04){
+			printf_e("elf is static?\n");
+			goto error;
+		}
+
+		if(pEhdr->e_machine != EM_ARM){
+			printf_e("Not ARM elf\n");
+			goto error;
+		}
+
+		if(pEhdr->e_ehsize != 0x34){
+			printf_e("Invalid elf header size = 0x%X\n", pEhdr->e_ehsize);
+			goto error;
+		}
+
+		if(pEhdr->e_phentsize != sizeof(Elf32_Phdr)){
+			printf_e("Invalid elf program header size = 0x%X\n", pEhdr->e_phentsize);
+			goto error;
+		}
+
+		pPhdr = (Elf32_Phdr *)malloc(sizeof(Elf32_Phdr) * pEhdr->e_phnum);
+		if(pPhdr == NULL){
+			printf_e("cannot allocate memory for elf program header\n");
+			goto error;
+		}
+
+		lseek(fd, pEhdr->e_phoff, SEEK_SET);
+		readbyte = read(fd, pPhdr, sizeof(Elf32_Phdr) * pEhdr->e_phnum);
+		if(readbyte != (sizeof(Elf32_Phdr) * pEhdr->e_phnum)){
+			printf_e("Elf read failed = 0x%X\n", readbyte);
+			goto error;
+		}
+
+		for(int i=0;i<pEhdr->e_phnum;i++){
+			printf_d("[%d] type  :0x%08X offset:0x%08X vaddr:0x%08X paddr:0x%08X\n",
+				i,
+				pPhdr[i].p_type,
+				pPhdr[i].p_offset,
+				pPhdr[i].p_vaddr,
+				pPhdr[i].p_paddr
+			);
+			printf_d("    filesz:0x%08X memsz :0x%08X flags:0x%08X align:0x%08X\n",
+				pPhdr[i].p_filesz,
+				pPhdr[i].p_memsz,
+				pPhdr[i].p_flags,
+				pPhdr[i].p_align
+			);
+
+			context.segment[i].pData = malloc(pPhdr[i].p_filesz);
+			context.segment[i].memsz = pPhdr[i].p_filesz;
+			if(context.segment[i].pData == NULL){
+				printf_e("Cannot allocate memory for segment\n");
+				goto error;
+			}
+
+			lseek(fd, pPhdr[i].p_offset, SEEK_SET);
+			readbyte = read(fd, context.segment[i].pData, pPhdr[i].p_filesz);
+			if(readbyte != pPhdr[i].p_filesz){
+				printf_e("segment read error = 0x%X\n", readbyte);
+				goto error;
+			}
 		}
 	}
 
@@ -256,8 +350,8 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 	context.pEhdr        = pEhdr;
 	context.pPhdr        = pPhdr;
 	context.pSegmentInfo = pSegmentInfo;
-	context.pAppInfo = pAppInfo;
-	context.pVersion = pVersion;
+	context.pAppInfo     = pAppInfo;
+	context.pVersion     = pVersion;
 	context.pControlInfo = pControlInfo;
 
 	printf_d("context value setting ... ok\n");
@@ -340,10 +434,12 @@ int module_loader_save(ModuleLoaderContext *pContext, const char *path){
 		// printf("0x%08X/0x%08X\n", segment_offset0, segment_offset1);
 
 		pContext->pPhdr[i].p_offset      = segment_offset0;
-		pContext->pSegmentInfo[i].offset = segment_offset1;
+		if(module_loader_is_elf(pContext) == 0)
+			pContext->pSegmentInfo[i].offset = segment_offset1;
 
 		segment_offset0 += pContext->pPhdr[i].p_filesz;
-		segment_offset1 += pContext->pSegmentInfo[i].length;
+		if(module_loader_is_elf(pContext) == 0)
+			segment_offset1 += pContext->pSegmentInfo[i].length;
 	}
 
 	int fd;
@@ -355,76 +451,88 @@ int module_loader_save(ModuleLoaderContext *pContext, const char *path){
 
 	uint64_t offset = sizeof(cf_header) + sizeof(ext_header);
 
-	cf_header tmp_cf_header;
-	memset(&tmp_cf_header, 0, sizeof(tmp_cf_header));
-	memcpy(&tmp_cf_header, pContext->pHeader, sizeof(tmp_cf_header));
+	if(module_loader_is_elf(pContext) == 0){
 
-	tmp_cf_header.m_file_size           = segment_offset0;
-	tmp_cf_header.m_certified_file_size = segment_offset1;
+		cf_header tmp_cf_header;
+		memset(&tmp_cf_header, 0, sizeof(tmp_cf_header));
+		memcpy(&tmp_cf_header, pContext->pHeader, sizeof(tmp_cf_header));
 
-	write(fd, &tmp_cf_header, sizeof(tmp_cf_header));
+		tmp_cf_header.m_file_size           = segment_offset0;
+		tmp_cf_header.m_certified_file_size = segment_offset1;
 
-	ext_header tmp_ext_header;
-	memset(&tmp_ext_header, 0, sizeof(tmp_ext_header));
+		write(fd, &tmp_cf_header, sizeof(tmp_cf_header));
 
-	tmp_ext_header.self_offset = 4;
+		ext_header tmp_ext_header;
+		memset(&tmp_ext_header, 0, sizeof(tmp_ext_header));
 
-	offset  = (offset + 0xF) & ~0xF;
-	tmp_ext_header.appinfo_offset = offset;
-	offset += sizeof(SCE_appinfo);
+		tmp_ext_header.self_offset = 4;
 
-	offset  = (offset + 0xF) & ~0xF;
-	tmp_ext_header.elf_offset = offset;
-	offset += sizeof(Elf32_Ehdr);
+		offset  = (offset + 0xF) & ~0xF;
+		tmp_ext_header.appinfo_offset = offset;
+		offset += sizeof(SCE_appinfo);
 
-	offset  = (offset + 0xF) & ~0xF;
-	tmp_ext_header.phdr_offset = offset;
-	offset += sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum;
+		offset  = (offset + 0xF) & ~0xF;
+		tmp_ext_header.elf_offset = offset;
+		offset += sizeof(Elf32_Ehdr);
 
-	offset  = (offset + 0xF) & ~0xF;
-	tmp_ext_header.shdr_offset = 0;
-	offset += 0;
+		offset  = (offset + 0xF) & ~0xF;
+		tmp_ext_header.phdr_offset = offset;
+		offset += sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum;
 
-	offset  = (offset + 0xF) & ~0xF;
-	tmp_ext_header.section_info_offset = offset;
-	offset += sizeof(segment_info) * pContext->pEhdr->e_phnum;
+		offset  = (offset + 0xF) & ~0xF;
+		tmp_ext_header.shdr_offset = 0;
+		offset += 0;
 
-	offset  = (offset + 0xF) & ~0xF;
-	tmp_ext_header.sceversion_offset = offset;
-	offset += sizeof(SCE_version);
+		offset  = (offset + 0xF) & ~0xF;
+		tmp_ext_header.section_info_offset = offset;
+		offset += sizeof(segment_info) * pContext->pEhdr->e_phnum;
 
-	offset  = (offset + 0xF) & ~0xF;
-	tmp_ext_header.controlinfo_offset = offset;
-	tmp_ext_header.controlinfo_size = pContext->pExtHeader->controlinfo_size;
-	offset += tmp_ext_header.controlinfo_size;
+		offset  = (offset + 0xF) & ~0xF;
+		tmp_ext_header.sceversion_offset = offset;
+		offset += sizeof(SCE_version);
 
-	write(fd, &tmp_ext_header, sizeof(tmp_ext_header));
+		offset  = (offset + 0xF) & ~0xF;
+		tmp_ext_header.controlinfo_offset = offset;
+		tmp_ext_header.controlinfo_size = pContext->pExtHeader->controlinfo_size;
+		offset += tmp_ext_header.controlinfo_size;
 
-	lseek(fd, tmp_ext_header.appinfo_offset, SEEK_SET);
-	write(fd, pContext->pAppInfo, sizeof(SCE_appinfo));
+		write(fd, &tmp_ext_header, sizeof(tmp_ext_header));
 
-	lseek(fd, tmp_ext_header.elf_offset, SEEK_SET);
-	write(fd, pContext->pEhdr, sizeof(Elf32_Ehdr));
+		lseek(fd, tmp_ext_header.appinfo_offset, SEEK_SET);
+		write(fd, pContext->pAppInfo, sizeof(SCE_appinfo));
 
-	lseek(fd, tmp_ext_header.phdr_offset, SEEK_SET);
-	write(fd, pContext->pPhdr, ((sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum) + 0xF) & ~0xF);
+		lseek(fd, tmp_ext_header.elf_offset, SEEK_SET);
+		write(fd, pContext->pEhdr, sizeof(Elf32_Ehdr));
 
-	lseek(fd, tmp_ext_header.section_info_offset, SEEK_SET);
-	write(fd, pContext->pSegmentInfo, sizeof(segment_info) * pContext->pEhdr->e_phnum);
+		lseek(fd, tmp_ext_header.phdr_offset, SEEK_SET);
+		write(fd, pContext->pPhdr, ((sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum) + 0xF) & ~0xF);
 
-	lseek(fd, tmp_ext_header.sceversion_offset, SEEK_SET);
-	write(fd, pContext->pVersion, sizeof(SCE_version));
+		lseek(fd, tmp_ext_header.section_info_offset, SEEK_SET);
+		write(fd, pContext->pSegmentInfo, sizeof(segment_info) * pContext->pEhdr->e_phnum);
 
-	lseek(fd, tmp_ext_header.controlinfo_offset, SEEK_SET);
-	write(fd, pContext->pControlInfo, tmp_ext_header.controlinfo_size);
+		lseek(fd, tmp_ext_header.sceversion_offset, SEEK_SET);
+		write(fd, pContext->pVersion, sizeof(SCE_version));
 
-	lseek(fd, 0x1000, SEEK_SET);
-	write(fd, pContext->pEhdr, sizeof(Elf32_Ehdr));
-	write(fd, pContext->pPhdr, sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum);
+		lseek(fd, tmp_ext_header.controlinfo_offset, SEEK_SET);
+		write(fd, pContext->pControlInfo, tmp_ext_header.controlinfo_size);
 
-	for(int i=0;i<pContext->pEhdr->e_phnum;i++){
-		lseek(fd, pContext->pSegmentInfo[i].offset, SEEK_SET);
-		write(fd, pContext->segment[i].pData, pContext->pSegmentInfo[i].length);
+		lseek(fd, 0x1000, SEEK_SET);
+		write(fd, pContext->pEhdr, sizeof(Elf32_Ehdr));
+		write(fd, pContext->pPhdr, sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum);
+
+		for(int i=0;i<pContext->pEhdr->e_phnum;i++){
+			lseek(fd, pContext->pSegmentInfo[i].offset, SEEK_SET);
+			write(fd, pContext->segment[i].pData, pContext->pSegmentInfo[i].length);
+		}
+	}else{
+		lseek(fd, 0, SEEK_SET);
+		write(fd, pContext->pEhdr, sizeof(Elf32_Ehdr));
+		write(fd, pContext->pPhdr, sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum);
+
+		for(int i=0;i<pContext->pEhdr->e_phnum;i++){
+			lseek(fd, pContext->pPhdr[i].p_offset, SEEK_SET);
+			write(fd, pContext->segment[i].pData, pContext->pPhdr[i].p_filesz);
+		}
 	}
 
 	close(fd);
