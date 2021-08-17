@@ -18,6 +18,10 @@ When you have everything you need, run `./build.sh` and wait for the build to co
 
 Specify the `-src` and `-dst` arguments on the command line.
 
+- `-src=`:input module path. As elf/self format.
+
+- `-dst=`:output module path. Specifying `-dst=` is optional, and if only `-src=` is used, only the conversion log will be output and the converted module will not be saved.
+
 Example : `./psp2rela -src=./input_module.self -dst=./output_module.self`
 
 You can specify the flag with `-flag=`.
@@ -29,8 +33,6 @@ You can specify the flag with `-flag=`.
 - `s`:Parses the rel config of the module specified by src and outputs it to the log. Also with this option, `-dst=` is ignored and only log output is available.
 
 Example : `./psp2rela -src=./input_module.self -dst=./output_module.self -flag=vvvf -log_dst=./log.txt`
-
-Specifying -dst = is optional, and if only -src = is used, only the conversion log will be output and the converted module will not be saved.
 
 # Information
 
