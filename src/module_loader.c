@@ -71,16 +71,18 @@ int module_loader_add_elf_entry(ModuleLoaderContext *pContext, int type, int fla
 	pContext->pPhdr[i].p_flags = flags;
 	pContext->pPhdr[i].p_align = 0x10;
 
-	segment_info *pSegmentInfoTmp = (segment_info *)malloc(sizeof(segment_info) * (i + 1));
-	memset(pSegmentInfoTmp, 0, sizeof(segment_info) * (i + 1));
-	memcpy(pSegmentInfoTmp, pContext->pSegmentInfo, sizeof(segment_info) * i);
-	free(pContext->pSegmentInfo);
+	if(module_loader_is_elf(pContext) == 0){
+		segment_info *pSegmentInfoTmp = (segment_info *)malloc(sizeof(segment_info) * (i + 1));
+		memset(pSegmentInfoTmp, 0, sizeof(segment_info) * (i + 1));
+		memcpy(pSegmentInfoTmp, pContext->pSegmentInfo, sizeof(segment_info) * i);
+		free(pContext->pSegmentInfo);
 
-	pContext->pSegmentInfo = pSegmentInfoTmp;
-	pSegmentInfoTmp[i].offset = 0;
-	pSegmentInfoTmp[i].length = 0;
-	pSegmentInfoTmp[i].compression = 2; // 1 = uncompressed, 2 = compressed
-	pSegmentInfoTmp[i].encryption  = 2; // 1 = encrypted,    2 = plain
+		pContext->pSegmentInfo = pSegmentInfoTmp;
+		pSegmentInfoTmp[i].offset = 0;
+		pSegmentInfoTmp[i].length = 0;
+		pSegmentInfoTmp[i].compression = 2; // 1 = uncompressed, 2 = compressed
+		pSegmentInfoTmp[i].encryption  = 2; // 1 = encrypted,    2 = plain
+	}
 
 	pContext->pEhdr->e_phnum = i + 1;
 
@@ -117,9 +119,9 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 	cf_header_t cf_header;
 	memset(&cf_header, 0, sizeof(cf_header));
 
-	fd = open(path, O_RDONLY | O_BINARY);
+	fd = open(path, O_RDONLY | O_BINARY, S_IRWXU);
 	if(fd < 0){
-		printf("self open failed\n");
+		printf_e("self open failed\n");
 		return fd;
 	}
 
