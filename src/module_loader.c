@@ -137,8 +137,7 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 		goto error;
 	}
 
-	int is_elf = cf_header.base.m_magic == 0x464C457F; // TODO:support raw elf
-
+	int is_elf = cf_header.base.m_magic == 0x464C457F;
 	if(is_elf == 0){
 		if(cf_header.base.m_version != 3){
 			printf_e("This self is not version 3\n");
