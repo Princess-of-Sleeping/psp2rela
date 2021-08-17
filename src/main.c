@@ -177,8 +177,8 @@ int main(int argc, char *argv[]){
 
 	res = module_loader_open(src_path, &pContext);
 	if(res < 0){
-		printf("cannot open module\n");
-		return 1;
+		printf_e("cannot open module\n");
+		goto error;
 	}
 
 	printf_d("module open success\n");
