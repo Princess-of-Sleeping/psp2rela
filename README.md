@@ -36,7 +36,7 @@ Example : `./psp2rela -src=./input_module.self -dst=./output_module.self -flag=v
 
 # Information
 
-A. VitaSDK uses all type0.
+A. VitaSDK uses type0 only.
 
 B. Official external SDK uses only type0 and type1.
 
