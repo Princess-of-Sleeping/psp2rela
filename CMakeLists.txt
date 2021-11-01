@@ -16,6 +16,7 @@ add_executable(psp2rela
 )
 
 target_link_libraries(psp2rela
-  stdc++
   z
 )
+
+install(TARGETS psp2rela DESTINATION "$ENV{VITASDK}/bin")
