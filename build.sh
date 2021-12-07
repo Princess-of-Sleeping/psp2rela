@@ -5,5 +5,5 @@ fi
 
 cd build
 cmake ../
-make install
+sudo make install
 cd ..
