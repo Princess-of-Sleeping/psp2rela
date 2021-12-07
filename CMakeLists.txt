@@ -19,4 +19,5 @@ target_link_libraries(psp2rela
   z
 )
 
-install(TARGETS psp2rela DESTINATION "$ENV{VITASDK}/bin")
+# install(TARGETS psp2rela DESTINATION "$ENV{VITASDK}/bin")
+install(TARGETS psp2rela DESTINATION bin)
