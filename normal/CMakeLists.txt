@@ -1,8 +1,8 @@
-find_package(zlib REQUIRED)
+cmake_minimum_required(VERSION 3.0)
 
-include_directories(${zlib_INCLUDE_DIRS})
+project(psp2rela C)
 
-set(CMAKE_C_FLAGS "-fvisibility=hidden -g -std=gnu99")
+set(CMAKE_C_COMPILE_FEATURES "${CMAKE_C_FLAGS} -Wunused-result -Wl,-q -Wall -O3 -fno-inline -fno-builtin")
 
 add_executable(psp2rela
   src/main.c
@@ -16,7 +16,8 @@ add_executable(psp2rela
 )
 
 target_link_libraries(psp2rela
-  ${zlib_LIBRARIES}
+  z
 )
 
+# install(TARGETS psp2rela DESTINATION "$ENV{VITASDK}/bin")
 install(TARGETS psp2rela DESTINATION bin)

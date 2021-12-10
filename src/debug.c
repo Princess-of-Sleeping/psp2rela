@@ -9,26 +9,25 @@
 #include <stdarg.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include "sysio.h"
 #include "debug.h"
 
 int rela_debug_level = RELA_DBG_LOG_LEVEL_NONE;
 
 #define RELA_LOG_BUFFER_SIZE (0x1000)
 
-int log_fd = -1;
+FILE *log_fd = NULL;
 char log_buffer[RELA_LOG_BUFFER_SIZE];
 unsigned int log_write_size;
 int is_rela_show_mode;
 
 int log_open(const char *path){
 
-	if(log_fd >= 0)
+	if(log_fd != NULL)
 		return -1;
 
-	log_fd = open(path, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY, S_IRWXU);
-	if(log_fd < 0){
-		return log_fd;
+	log_fd = fopen(path, "wb+");
+	if(log_fd == NULL){
+		return -1;
 	}
 
 	log_write_size = 0;
@@ -39,17 +38,17 @@ int log_open(const char *path){
 
 int log_close(void){
 
-	if(log_fd < 0)
+	if(log_fd == 0)
 		return -1;
 
 	if(log_write_size > 0){
-		write(log_fd, log_buffer, log_write_size);
+		fwrite(log_buffer, log_write_size, 1, log_fd);
 		memset(log_buffer, 0, RELA_LOG_BUFFER_SIZE);
 		log_write_size = 0;
 	}
 
-	close(log_fd);
-	log_fd = -1;
+	fclose(log_fd);
+	log_fd = NULL;
 
 	return 0;
 }
@@ -61,7 +60,7 @@ int log_write(const char *fmt, ...){
 	va_list args;
 	char string[0x200];
 
-	if(log_fd < 0)
+	if(log_fd == 0)
 		return -1;
 
 	memset(string, 0, sizeof(string));
@@ -74,7 +73,7 @@ int log_write(const char *fmt, ...){
 		buffer_remain = RELA_LOG_BUFFER_SIZE - log_write_size;
 
 		memcpy(&log_buffer[log_write_size], string, buffer_remain);
-		write(log_fd, log_buffer, RELA_LOG_BUFFER_SIZE);
+		fwrite(log_buffer, RELA_LOG_BUFFER_SIZE, 1, log_fd);
 		memset(log_buffer, 0, RELA_LOG_BUFFER_SIZE);
 		log_write_size = 0;
 		len -= buffer_remain;
@@ -111,6 +110,8 @@ int rela_debug_init(const char *args, const char *path){
 		case 's':
 			is_rela_show_mode = 1;
 			break;
+		case 'n': // nop
+			break;
 		default:
 			printf("%s:Unknown args char = %c\n", __FUNCTION__, *args);
 			break;
@@ -145,7 +146,7 @@ int printf_internal(int level, const char *fmt, va_list args){
 	memset(string, 0, sizeof(string));
 	vsnprintf(string, sizeof(string) - 1, fmt, args);
 
-	if(log_fd < 0){
+	if(log_fd == NULL){
 		printf("%s", string);
 	}else{
 		log_write("%s", string);

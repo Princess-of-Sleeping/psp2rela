@@ -7,7 +7,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include "sysio.h"
 #include "debug.h"
 #include "module_loader.h"
 
@@ -95,7 +94,7 @@ int module_loader_is_elf(const ModuleLoaderContext *pContext){
 
 int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 
-	int fd, readbyte;
+	FILE *fd;
 	void         *pHeader      = NULL;
 	cf_header_t  *pCfHeader    = NULL;
 	ext_header   *pExtHeader   = NULL;
@@ -114,22 +113,20 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 
 	*ppResult = NULL;
 	memset(&context, 0, sizeof(context));
-	fd = -1;
+	fd = NULL;
 
 	cf_header_t cf_header;
 	memset(&cf_header, 0, sizeof(cf_header));
 
-	fd = open(path, O_RDONLY | O_BINARY, S_IRWXU);
-	if(fd < 0){
+	fd = fopen(path, "rb");
+	if(fd == NULL){
 		printf_e("self open failed\n");
-		return fd;
+		return -1;
 	}
 
 	printf_d("module file open success\n");
 
-	readbyte = read(fd, &cf_header, sizeof(cf_header));
-
-	if(readbyte != sizeof(cf_header)){
+	if(fread(&cf_header, sizeof(cf_header), 1, fd) != 1){
 		printf_e("File read error\n");
 		goto error;
 	}
@@ -164,10 +161,8 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 			goto error;
 		}
 
-		lseek(fd, 0, SEEK_SET);
-		readbyte = read(fd, pHeader, cf_header.header_v3.m_header_length);
-
-		if(readbyte != cf_header.header_v3.m_header_length){
+		fseek(fd, 0LL, SEEK_SET);
+		if(fread(pHeader, cf_header.header_v3.m_header_length, 1, fd) != 1){
 			printf_e("self header : readbyte != cf_header.header_v3.m_header_length\n");
 			goto error;
 		}
@@ -248,11 +243,12 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 				goto error;
 			}
 
-			lseek(fd, pSegmentInfo[i].offset, SEEK_SET);
-			readbyte = read(fd, context.segment[i].pData, pSegmentInfo[i].length);
-			if(readbyte != pSegmentInfo[i].length){
-				printf_e("segment read error = 0x%X\n", readbyte);
-				goto error;
+			if(pSegmentInfo[i].length != 0LL){
+				fseek(fd, pSegmentInfo[i].offset, SEEK_SET);
+				if(fread(context.segment[i].pData, pSegmentInfo[i].length, 1, fd) != 1){
+					printf_e("segment %d read error (%d)\n", i, __LINE__);
+					goto error;
+				}
 			}
 		}
 	}else{
@@ -264,10 +260,9 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 			goto error;
 		}
 
-		lseek(fd, 0, SEEK_SET);
-		readbyte = read(fd, pHeader, 0x34);
-		if(readbyte != 0x34){
-			printf_e("elf header read error = 0x%X\n", readbyte);
+		fseek(fd, 0LL, SEEK_SET);
+		if(fread(pHeader, 0x34, 1, fd) != 1){
+			printf_e("elf header read error\n");
 			goto error;
 		}
 
@@ -299,10 +294,9 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 			goto error;
 		}
 
-		lseek(fd, pEhdr->e_phoff, SEEK_SET);
-		readbyte = read(fd, pPhdr, sizeof(Elf32_Phdr) * pEhdr->e_phnum);
-		if(readbyte != (sizeof(Elf32_Phdr) * pEhdr->e_phnum)){
-			printf_e("Elf read failed = 0x%X\n", readbyte);
+		fseek(fd, pEhdr->e_phoff, SEEK_SET);
+		if(fread(pPhdr, sizeof(Elf32_Phdr) * pEhdr->e_phnum, 1, fd) != 1){
+			printf_e("Elf read failed\n");
 			goto error;
 		}
 
@@ -328,19 +322,20 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 				goto error;
 			}
 
-			lseek(fd, pPhdr[i].p_offset, SEEK_SET);
-			readbyte = read(fd, context.segment[i].pData, pPhdr[i].p_filesz);
-			if(readbyte != pPhdr[i].p_filesz){
-				printf_e("segment read error = 0x%X\n", readbyte);
-				goto error;
+			if(pPhdr[i].p_filesz != 0){
+				fseek(fd, pPhdr[i].p_offset, SEEK_SET);
+				if(fread(context.segment[i].pData, pPhdr[i].p_filesz, 1, fd) != 1){
+					printf_e("segment %d read error (%d)\n", i, __LINE__);
+					goto error;
+				}
 			}
 		}
 	}
 
 	printf_d("Segment read success\n");
 
-	close(fd);
-	fd = -1;
+	fclose(fd);
+	fd = NULL;
 
 	printf_d("file closed\n");
 	printf_d("context value setting ...\n");
@@ -372,9 +367,9 @@ int module_loader_open(const char *path, ModuleLoaderContext **ppResult){
 	return 0;
 
 error:
-	if(fd >= 0){
-		close(fd);
-		fd = -1;
+	if(fd != NULL){
+		fclose(fd);
+		fd = NULL;
 	}
 
 	for(int i=0;i<6;i++){
@@ -443,11 +438,12 @@ int module_loader_save(ModuleLoaderContext *pContext, const char *path){
 			segment_offset1 += pContext->pSegmentInfo[i].length;
 	}
 
-	int fd;
-	fd = open(path, O_CREAT | O_TRUNC | O_WRONLY | O_BINARY, S_IRWXU);
+	FILE *fd;
+
+	fd = fopen(path, "wb+");
 	if(fd < 0){
 		printf("cannot create output file\n");
-		return fd;
+		return -1;
 	}
 
 	uint64_t offset = sizeof(cf_header) + sizeof(ext_header);
@@ -461,7 +457,7 @@ int module_loader_save(ModuleLoaderContext *pContext, const char *path){
 		tmp_cf_header.m_file_size           = segment_offset0;
 		tmp_cf_header.m_certified_file_size = segment_offset1;
 
-		write(fd, &tmp_cf_header, sizeof(tmp_cf_header));
+		fwrite(&tmp_cf_header, sizeof(tmp_cf_header), 1, fd);
 
 		ext_header tmp_ext_header;
 		memset(&tmp_ext_header, 0, sizeof(tmp_ext_header));
@@ -497,46 +493,48 @@ int module_loader_save(ModuleLoaderContext *pContext, const char *path){
 		tmp_ext_header.controlinfo_size = pContext->pExtHeader->controlinfo_size;
 		offset += tmp_ext_header.controlinfo_size;
 
-		write(fd, &tmp_ext_header, sizeof(tmp_ext_header));
+		fwrite(&tmp_ext_header, sizeof(tmp_ext_header), 1, fd);
 
-		lseek(fd, tmp_ext_header.appinfo_offset, SEEK_SET);
-		write(fd, pContext->pAppInfo, sizeof(SCE_appinfo));
+		fseek(fd, tmp_ext_header.appinfo_offset, SEEK_SET);
+		fwrite(pContext->pAppInfo, sizeof(SCE_appinfo), 1, fd);
 
-		lseek(fd, tmp_ext_header.elf_offset, SEEK_SET);
-		write(fd, pContext->pEhdr, sizeof(Elf32_Ehdr));
+		fseek(fd, tmp_ext_header.elf_offset, SEEK_SET);
+		fwrite(pContext->pEhdr, sizeof(Elf32_Ehdr), 1, fd);
 
-		lseek(fd, tmp_ext_header.phdr_offset, SEEK_SET);
-		write(fd, pContext->pPhdr, ((sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum) + 0xF) & ~0xF);
+		fseek(fd, tmp_ext_header.phdr_offset, SEEK_SET);
+		fwrite(pContext->pPhdr, ((sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum) + 0xF) & ~0xF, 1, fd);
 
-		lseek(fd, tmp_ext_header.section_info_offset, SEEK_SET);
-		write(fd, pContext->pSegmentInfo, sizeof(segment_info) * pContext->pEhdr->e_phnum);
+		fseek(fd, tmp_ext_header.section_info_offset, SEEK_SET);
+		fwrite(pContext->pSegmentInfo, sizeof(segment_info) * pContext->pEhdr->e_phnum, 1, fd);
 
-		lseek(fd, tmp_ext_header.sceversion_offset, SEEK_SET);
-		write(fd, pContext->pVersion, sizeof(SCE_version));
+		fseek(fd, tmp_ext_header.sceversion_offset, SEEK_SET);
+		fwrite(pContext->pVersion, sizeof(SCE_version), 1, fd);
 
-		lseek(fd, tmp_ext_header.controlinfo_offset, SEEK_SET);
-		write(fd, pContext->pControlInfo, tmp_ext_header.controlinfo_size);
+		fseek(fd, tmp_ext_header.controlinfo_offset, SEEK_SET);
+		fwrite(pContext->pControlInfo, tmp_ext_header.controlinfo_size, 1, fd);
 
-		lseek(fd, 0x1000, SEEK_SET);
-		write(fd, pContext->pEhdr, sizeof(Elf32_Ehdr));
-		write(fd, pContext->pPhdr, sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum);
+		fseek(fd, 0x1000, SEEK_SET);
+		fwrite(pContext->pEhdr, sizeof(Elf32_Ehdr), 1, fd);
+		fwrite(pContext->pPhdr, sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum, 1, fd);
 
 		for(int i=0;i<pContext->pEhdr->e_phnum;i++){
-			lseek(fd, pContext->pSegmentInfo[i].offset, SEEK_SET);
-			write(fd, pContext->segment[i].pData, pContext->pSegmentInfo[i].length);
+			fseek(fd, pContext->pSegmentInfo[i].offset, SEEK_SET);
+			fwrite(pContext->segment[i].pData, pContext->pSegmentInfo[i].length, 1, fd);
 		}
+
 	}else{
-		lseek(fd, 0, SEEK_SET);
-		write(fd, pContext->pEhdr, sizeof(Elf32_Ehdr));
-		write(fd, pContext->pPhdr, sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum);
+		fseek(fd, 0, SEEK_SET);
+		fwrite(pContext->pEhdr, sizeof(Elf32_Ehdr), 1, fd);
+		fwrite(pContext->pPhdr, sizeof(Elf32_Phdr) * pContext->pEhdr->e_phnum, 1, fd);
 
 		for(int i=0;i<pContext->pEhdr->e_phnum;i++){
-			lseek(fd, pContext->pPhdr[i].p_offset, SEEK_SET);
-			write(fd, pContext->segment[i].pData, pContext->pPhdr[i].p_filesz);
+			fseek(fd, pContext->pPhdr[i].p_offset, SEEK_SET);
+			fwrite(pContext->segment[i].pData, pContext->pPhdr[i].p_filesz, 1, fd);
 		}
 	}
 
-	close(fd);
+	fclose(fd);
+	fd = NULL;
 
 	return 0;
 }

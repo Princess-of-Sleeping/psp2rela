@@ -9,7 +9,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <zlib.h>
-#include "sysio.h"
 #include "debug.h"
 #include "module_loader.h"
 #include "module_relocation.h"
