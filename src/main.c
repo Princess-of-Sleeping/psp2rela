@@ -155,6 +155,12 @@ int main(int argc, char *argv[]){
 	int res;
 	ModuleLoaderContext *pContext;
 
+	void *rel_config0 = NULL, *rel_config1 = NULL, *rel_config0_res = NULL, *rel_config1_res = NULL;
+	long unsigned int rel_config_size0 = 0, rel_config_size1 = 0;
+	int rel_config_size0_res = 0, rel_config_size1_res = 0;
+
+	int seg0_rel_idx, seg1_rel_idx;
+
 	const char *src_path = find_item(argc, argv, "-src=");
 	const char *dst_path = find_item(argc, argv, "-dst=");
 
@@ -219,12 +225,6 @@ int main(int argc, char *argv[]){
 
 	printf_d("Pre-relocation ... ok\n\n");
 #endif
-
-	void *rel_config0 = NULL, *rel_config1 = NULL, *rel_config0_res = NULL, *rel_config1_res = NULL;
-	long unsigned int rel_config_size0 = 0, rel_config_size1 = 0;
-	int rel_config_size0_res = 0, rel_config_size1_res = 0;
-
-	int seg0_rel_idx, seg1_rel_idx;
 
 	seg0_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0);
 	seg1_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0x10000);

@@ -441,7 +441,7 @@ int module_loader_save(ModuleLoaderContext *pContext, const char *path){
 	FILE *fd;
 
 	fd = fopen(path, "wb+");
-	if(fd < 0){
+	if(fd == NULL){
 		printf("cannot create output file\n");
 		return -1;
 	}
