@@ -32,28 +32,28 @@ int module_loader_close(ModuleLoaderContext *pContext){
 	return 0;
 }
 
-int module_loader_search_elf_index(ModuleLoaderContext *pContext, int type, int flags){
+int module_loader_search_elf_index(ModuleLoaderContext *pContext, int type, int flags, int flags_mask){
 
 	if(pContext == NULL){
 		return -1;
 	}
 
 	for(int i=0;i<pContext->pEhdr->e_phnum;i++){
-		if(pContext->pPhdr[i].p_type == type && pContext->pPhdr[i].p_flags == flags)
+		if(pContext->pPhdr[i].p_type == type && (flags_mask & pContext->pPhdr[i].p_flags) == flags)
 			return i;
 	}
 
 	return -2;
 }
 
-int module_loader_add_elf_entry(ModuleLoaderContext *pContext, int type, int flags){
+int module_loader_add_elf_entry(ModuleLoaderContext *pContext, int type, int flags, int flags_mask){
 
 	int res;
 
 	if(pContext == NULL)
 		return -1;
 
-	res = module_loader_search_elf_index(pContext, type, flags);
+	res = module_loader_search_elf_index(pContext, type, flags, flags_mask);
 	if(res >= 0)
 		return -4;
 
@@ -87,6 +87,63 @@ int module_loader_add_elf_entry(ModuleLoaderContext *pContext, int type, int fla
 
 	return i;
 }
+
+int module_loader_remove_elf_entry(ModuleLoaderContext *pContext, int type, int flags, int flags_mask){
+
+	int res;
+
+	if(pContext == NULL)
+		return -1;
+
+	res = module_loader_search_elf_index(pContext, type, flags, flags_mask);
+	if(res < 0)
+		return -4;
+
+	int e_phnum = pContext->pEhdr->e_phnum;
+	if(1 == e_phnum){
+		return -1;
+	}
+
+	Elf32_Phdr *pPhdrTmp = (Elf32_Phdr *)malloc(((sizeof(Elf32_Phdr) * (e_phnum - 1)) + 0xF) & ~0xF);
+
+	memset(pPhdrTmp, 0, ((sizeof(Elf32_Phdr) * (e_phnum - 1)) + 0xF) & ~0xF);
+
+	for(int i=0;i<res;i++){
+		memcpy(&(pPhdrTmp[i]), &(pContext->pPhdr[i]), sizeof(Elf32_Phdr));
+	}
+
+	free(pContext->segment[res].pData);
+
+	for(int i=res+1;i<pContext->pEhdr->e_phnum;i++){
+		memcpy(&(pPhdrTmp[i - 1]), &(pContext->pPhdr[i]), sizeof(Elf32_Phdr));
+		memcpy(&(pContext->segment[i - 1]), &(pContext->segment[i]), sizeof(ModuleSegmentInfo));
+	}
+
+	free(pContext->pPhdr);
+	pContext->pPhdr = pPhdrTmp;
+
+	if(module_loader_is_elf(pContext) == 0){
+		segment_info *pSegmentInfoTmp = (segment_info *)malloc(sizeof(segment_info) * (e_phnum - 1));
+		memset(pSegmentInfoTmp, 0, sizeof(segment_info) * (e_phnum - 1));
+		// memcpy(pSegmentInfoTmp, pContext->pSegmentInfo, sizeof(segment_info) * i);
+
+		for(int i=0;i<res;i++){
+			memcpy(&(pSegmentInfoTmp[i]), &(pContext->pSegmentInfo[i]), sizeof(segment_info));
+		}
+
+		for(int i=res+1;i<pContext->pEhdr->e_phnum;i++){
+			memcpy(&(pSegmentInfoTmp[i - 1]), &(pContext->pSegmentInfo[i]), sizeof(segment_info));
+		}
+
+		free(pContext->pSegmentInfo);
+		pContext->pSegmentInfo = pSegmentInfoTmp;
+	}
+
+	pContext->pEhdr->e_phnum = e_phnum - 1;
+
+	return e_phnum;
+}
+
 
 int module_loader_is_elf(const ModuleLoaderContext *pContext){
 	return pContext->is_elf != 0;

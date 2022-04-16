@@ -34,7 +34,8 @@ int module_loader_save(ModuleLoaderContext *pContext, const char *path);
 
 int module_loader_is_elf(const ModuleLoaderContext *pContext);
 
-int module_loader_search_elf_index(ModuleLoaderContext *pContext, int type, int flags);
-int module_loader_add_elf_entry(ModuleLoaderContext *pContext, int type, int flags);
+int module_loader_search_elf_index(ModuleLoaderContext *pContext, int type, int flags, int flags_mask);
+int module_loader_add_elf_entry(ModuleLoaderContext *pContext, int type, int flags, int flags_mask);
+int module_loader_remove_elf_entry(ModuleLoaderContext *pContext, int type, int flags, int flags_mask);
 
 #endif /* _PSP2_MODULE_LOADER_H_ */

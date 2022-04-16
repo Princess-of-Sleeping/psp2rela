@@ -81,7 +81,64 @@ const char *find_item(int argc, char *argv[], const char *name){
 	return NULL;
 }
 
-int rela_do_relocation(ModuleLoaderContext *pContext){
+int parse_uint32_string(const char *s, uint32_t *result){
+
+	uint32_t value = 0;
+
+	if(strncmp(s, "0x", 2) == 0){
+		s = &(s[2]);
+	}
+
+	const char *end = &(s[8]);
+
+	while(s != end && *s != 0){
+		switch(*s){
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
+		case '8':
+		case '9':
+			value = (value << 4) | ((*s) - '0');
+			break;
+
+		case 'a':
+		case 'b':
+		case 'c':
+		case 'd':
+		case 'e':
+		case 'f':
+			value = (value << 4) | ((*s) - 'a' + 0xA);
+			break;
+
+		case 'A':
+		case 'B':
+		case 'C':
+		case 'D':
+		case 'E':
+		case 'F':
+			value = (value << 4) | ((*s) - 'A' + 0xA);
+			break;
+
+		default:
+			return -1;
+			break;
+		}
+		s++;
+	}
+
+	if(NULL != result){
+		*result = value;
+	}
+
+	return 0;
+}
+
+int rela_do_relocation(ModuleLoaderContext *pContext, int attr, uint32_t text_addr, uint32_t data_addr){
 
 	int res, seg0_idx, seg1_idx, seg0_rel_idx, seg1_rel_idx;
 
@@ -90,11 +147,11 @@ int rela_do_relocation(ModuleLoaderContext *pContext){
 	memset(&moduleLoadCtx, 0, sizeof(moduleLoadCtx));
 	memset(&moduleInfoInternal, 0, sizeof(moduleInfoInternal));
 
-	seg0_idx = module_loader_search_elf_index(pContext, 1, 5);
-	seg1_idx = module_loader_search_elf_index(pContext, 1, 6);
+	seg0_idx = module_loader_search_elf_index(pContext, 1, 5, PF_R | PF_W | PF_X);
+	seg1_idx = module_loader_search_elf_index(pContext, 1, 6, PF_R | PF_W | PF_X);
 
-	seg0_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0);
-	seg1_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0x10000);
+	seg0_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0, ~0);
+	seg1_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0x10000, ~0);
 
 	moduleLoadCtx.pModuleInfo = &moduleInfoInternal;
 
@@ -106,14 +163,21 @@ int rela_do_relocation(ModuleLoaderContext *pContext){
 	if(seg0_idx >= 0){
 		int segment_num = moduleInfoInternal.segments_num;
 
-		uint32_t vaddr = 0x81000000;
-		pContext->pPhdr[seg0_idx].p_vaddr = vaddr;
-		pContext->pPhdr[seg0_idx].p_paddr = vaddr;
+		uint32_t vaddr;
+
+		if((attr & 1) != 0){
+			vaddr = text_addr;
+		}else{
+			vaddr = 0x81000000; // user/kernel default text base
+		}
+
 		moduleInfoInternal.segments[segment_num].vaddr = vaddr;
 		moduleInfoInternal.segments[segment_num].memsz  = pContext->pPhdr[seg0_idx].p_memsz;
 		moduleInfoInternal.segments[segment_num].filesz = pContext->pPhdr[seg0_idx].p_filesz;
 		moduleLoadCtx.segments[segment_num].base = pContext->pPhdr[seg0_idx].p_vaddr;
 		moduleLoadCtx.segments[segment_num].pKernelMap = pContext->segment[seg0_idx].pData;
+		pContext->pPhdr[seg0_idx].p_vaddr = vaddr;
+		pContext->pPhdr[seg0_idx].p_paddr = vaddr;
 
 		moduleInfoInternal.segments_num = segment_num + 1;
 
@@ -123,18 +187,58 @@ int rela_do_relocation(ModuleLoaderContext *pContext){
 	if(seg1_idx >= 0){
 		int segment_num = moduleInfoInternal.segments_num;
 
-		uint32_t vaddr = ((0x81000000 + pContext->pPhdr[seg0_idx].p_memsz) + 0xFFF) & ~0xFFF;
-		pContext->pPhdr[seg1_idx].p_vaddr = vaddr;
-		pContext->pPhdr[seg1_idx].p_paddr = vaddr;
+		uint32_t vaddr;
+
+		if((attr & 2) != 0){
+			vaddr = data_addr;
+		}else{
+			vaddr = ((moduleInfoInternal.segments[moduleInfoInternal.segments_num - 1].vaddr + pContext->pPhdr[seg0_idx].p_memsz) + 0xFFF) & ~0xFFF;
+		}
+
 		moduleInfoInternal.segments[segment_num].vaddr = vaddr;
 		moduleInfoInternal.segments[segment_num].memsz  = pContext->pPhdr[seg1_idx].p_memsz;
 		moduleInfoInternal.segments[segment_num].filesz = pContext->pPhdr[seg1_idx].p_filesz;
 		moduleLoadCtx.segments[segment_num].base = pContext->pPhdr[seg1_idx].p_vaddr;
 		moduleLoadCtx.segments[segment_num].pKernelMap = pContext->segment[seg1_idx].pData;
+		pContext->pPhdr[seg1_idx].p_vaddr = vaddr;
+		pContext->pPhdr[seg1_idx].p_paddr = vaddr;
 
 		moduleInfoInternal.segments_num = segment_num + 1;
 
 		printf_i("segment %d new vaddr : 0x%08X(0x%08X)\n", segment_num, vaddr, moduleInfoInternal.segments[segment_num].memsz);
+	}
+
+	// Address overlapping check
+	for(int i=0;i<moduleInfoInternal.segments_num;i++){
+
+		uint32_t v1 = moduleInfoInternal.segments[i].vaddr;
+
+		for(int n=0;n<moduleInfoInternal.segments_num;n++){
+			if(i != n){
+
+				uint32_t v2 = moduleInfoInternal.segments[n].vaddr;
+
+				if((uint32_t)(v2 - v1) < (uint32_t)moduleInfoInternal.segments[i].memsz){
+
+					printf_e("segment %d start address overlapped\n", n);
+					printf_e("segment %d, base: 0x%08X size: 0x%08X\n", i, v1, moduleInfoInternal.segments[i].memsz);
+					printf_e("segment %d, base: 0x%08X size: 0x%08X\n", n, v2, moduleInfoInternal.segments[n].memsz);
+
+					return -1;
+				}
+
+				v2 += (moduleInfoInternal.segments[n].memsz - 1);
+
+				if((uint32_t)(v2 - v1) < (uint32_t)moduleInfoInternal.segments[i].memsz){
+
+					printf_e("segment %d end address overlapped\n", n);
+					printf_e("segment %d, base: 0x%08X size: 0x%08X\n", i, v1, moduleInfoInternal.segments[i].memsz);
+					printf_e("segment %d, base: 0x%08X size: 0x%08X\n", n, v2, moduleInfoInternal.segments[n].memsz);
+
+					return -1;
+				}
+			}
+		}
 	}
 
 	printf_i("\n");
@@ -152,7 +256,7 @@ int rela_do_relocation(ModuleLoaderContext *pContext){
 
 int main(int argc, char *argv[]){
 
-	int res;
+	int res, rel_attr;
 	ModuleLoaderContext *pContext;
 
 	void *rel_config0 = NULL, *rel_config1 = NULL, *rel_config0_res = NULL, *rel_config1_res = NULL;
@@ -165,8 +269,35 @@ int main(int argc, char *argv[]){
 	const char *dst_path = find_item(argc, argv, "-dst=");
 
 	if(argc == 1 || src_path == NULL){
-		printf("psp2rela -src=in_file [-dst=out_file] [-flag=any_flags] [-log_dst=log_path]\n");
+		printf("psp2rela -src=in_file [-dst=out_file] [-flag=any_flags] [-log_dst=log_path] [-text_addr=hex] [-data_addr=hex] [-static_mode]\n");
 		return 1;
+	}
+
+
+	uint32_t text_addr = 0, data_addr = 0;
+
+	rel_attr = 0;
+
+	const char *text_addr_str = find_item(argc, argv, "-text_addr=");
+	if(NULL != text_addr_str){
+		text_addr = 0;
+		res = parse_uint32_string(text_addr_str, &text_addr);
+		if(res < 0){
+			return -1;
+		}
+
+		rel_attr |= 1;
+	}
+
+	const char *data_addr_str = find_item(argc, argv, "-data_addr=");
+	if(NULL != data_addr_str){
+		data_addr = 0;
+		res = parse_uint32_string(data_addr_str, &data_addr);
+		if(res < 0){
+			return -1;
+		}
+
+		rel_attr |= 2;
 	}
 
 	const char *log_flag = find_item(argc, argv, "-flag=");
@@ -217,17 +348,41 @@ int main(int argc, char *argv[]){
 
 	printf_d("Pre-relocation ...\n");
 
-	res = rela_do_relocation(pContext);
+	res = rela_do_relocation(pContext, rel_attr, text_addr, data_addr);
 	if(res < 0){
 		printf_e("rela_do_relocation failed : 0x%X\n", res);
 		goto error;
 	}
 
 	printf_d("Pre-relocation ... ok\n\n");
+
+	const char *static_mode = find_item(argc, argv, "-static_mode");
+	if(NULL != static_mode){
+
+		seg0_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0, ~0);
+		if(seg0_rel_idx >= 0){
+			res = module_loader_remove_elf_entry(pContext, 0x60000000, 0, ~0);
+			if(res < 0){
+				goto error;
+			}
+		}
+
+		seg1_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0x10000, ~0);
+		if(seg1_rel_idx >= 0){
+			res = module_loader_remove_elf_entry(pContext, 0x60000000, 0x10000, ~0);
+			if(res < 0){
+				goto error;
+			}
+		}
+
+		pContext->pEhdr->e_type = 0xFE00;
+
+		goto rebuild;
+	}
 #endif
 
-	seg0_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0);
-	seg1_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0x10000);
+	seg0_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0, ~0);
+	seg1_rel_idx = module_loader_search_elf_index(pContext, 0x60000000, 0x10000, ~0);
 	if(seg0_rel_idx < 0){
 		printf_e("cannot get text segment rel config index\n");
 		goto error;
@@ -296,7 +451,7 @@ int main(int argc, char *argv[]){
 	 * Update segment infos
 	 */
 	if(seg1_rel_idx < 0 && rel_config1_res != NULL)
-		seg1_rel_idx = module_loader_add_elf_entry(pContext, 0x60000000, 0x10000);
+		seg1_rel_idx = module_loader_add_elf_entry(pContext, 0x60000000, 0x10000, ~0);
 
 	if(seg1_rel_idx < 0 && rel_config1_res != NULL){
 		printf_e("cannot add elf entry\n");
@@ -362,6 +517,7 @@ int main(int argc, char *argv[]){
 	rel_config0_res = NULL;
 	rel_config1_res = NULL;
 
+rebuild:
 	/*
 	 * Rebuild segment infos
 	 */
