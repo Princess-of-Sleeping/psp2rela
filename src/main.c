@@ -138,7 +138,11 @@ int parse_uint32_string(const char *s, uint32_t *result){
 	return 0;
 }
 
-int rela_do_relocation(ModuleLoaderContext *pContext, int attr, uint32_t text_addr, uint32_t data_addr){
+#define PSP2RELA_PRE_RELOCA_FLAG_HAS_TEXT   (1 << 0)
+#define PSP2RELA_PRE_RELOCA_FLAG_HAS_DATA   (1 << 1)
+#define PSP2RELA_PRE_RELOCA_FLAG_FETCH_BASE (1 << 2)
+
+int rela_do_relocation(ModuleLoaderContext *pContext, int flags, uint32_t text_addr, uint32_t data_addr){
 
 	int res, seg0_idx, seg1_idx, seg0_rel_idx, seg1_rel_idx;
 
@@ -165,10 +169,14 @@ int rela_do_relocation(ModuleLoaderContext *pContext, int attr, uint32_t text_ad
 
 		uint32_t vaddr;
 
-		if((attr & 1) != 0){
-			vaddr = text_addr;
+		if((flags & PSP2RELA_PRE_RELOCA_FLAG_FETCH_BASE) != 0){
+			vaddr = pContext->pPhdr[seg0_idx].p_vaddr;
 		}else{
 			vaddr = 0x81000000; // user/kernel default text base
+		}
+
+		if((flags & PSP2RELA_PRE_RELOCA_FLAG_HAS_TEXT) != 0){
+			vaddr = text_addr;
 		}
 
 		moduleInfoInternal.segments[segment_num].vaddr = vaddr;
@@ -189,10 +197,14 @@ int rela_do_relocation(ModuleLoaderContext *pContext, int attr, uint32_t text_ad
 
 		uint32_t vaddr;
 
-		if((attr & 2) != 0){
-			vaddr = data_addr;
+		if((flags & PSP2RELA_PRE_RELOCA_FLAG_FETCH_BASE) != 0){
+			vaddr = pContext->pPhdr[seg1_idx].p_vaddr;
 		}else{
 			vaddr = ((moduleInfoInternal.segments[moduleInfoInternal.segments_num - 1].vaddr + pContext->pPhdr[seg0_idx].p_memsz) + 0xFFF) & ~0xFFF;
+		}
+
+		if((flags & PSP2RELA_PRE_RELOCA_FLAG_HAS_DATA) != 0){
+			vaddr = data_addr;
 		}
 
 		moduleInfoInternal.segments[segment_num].vaddr = vaddr;
@@ -256,7 +268,7 @@ int rela_do_relocation(ModuleLoaderContext *pContext, int attr, uint32_t text_ad
 
 int main(int argc, char *argv[]){
 
-	int res, rel_attr;
+	int res, rel_flags;
 	ModuleLoaderContext *pContext;
 
 	void *rel_config0 = NULL, *rel_config1 = NULL, *rel_config0_res = NULL, *rel_config1_res = NULL;
@@ -269,14 +281,14 @@ int main(int argc, char *argv[]){
 	const char *dst_path = find_item(argc, argv, "-dst=");
 
 	if(argc == 1 || src_path == NULL){
-		printf("psp2rela -src=in_file [-dst=out_file] [-flag=any_flags] [-log_dst=log_path] [-text_addr=hex] [-data_addr=hex] [-static_mode]\n");
+		printf("psp2rela -src=in_file [-dst=out_file] [-flag=any_flags] [-log_dst=log_path] [-text_addr=hex] [-data_addr=hex] [-static_mode] [-fetch_base]\n");
 		return 1;
 	}
 
 
 	uint32_t text_addr = 0, data_addr = 0;
 
-	rel_attr = 0;
+	rel_flags = 0;
 
 	const char *text_addr_str = find_item(argc, argv, "-text_addr=");
 	if(NULL != text_addr_str){
@@ -286,7 +298,7 @@ int main(int argc, char *argv[]){
 			return -1;
 		}
 
-		rel_attr |= 1;
+		rel_flags |= PSP2RELA_PRE_RELOCA_FLAG_HAS_TEXT;
 	}
 
 	const char *data_addr_str = find_item(argc, argv, "-data_addr=");
@@ -297,7 +309,11 @@ int main(int argc, char *argv[]){
 			return -1;
 		}
 
-		rel_attr |= 2;
+		rel_flags |= PSP2RELA_PRE_RELOCA_FLAG_HAS_DATA;
+	}
+
+	if(NULL != find_item(argc, argv, "-fetch_base")){
+		rel_flags |= PSP2RELA_PRE_RELOCA_FLAG_FETCH_BASE;
 	}
 
 	const char *log_flag = find_item(argc, argv, "-flag=");
@@ -348,7 +364,7 @@ int main(int argc, char *argv[]){
 
 	printf_d("Pre-relocation ...\n");
 
-	res = rela_do_relocation(pContext, rel_attr, text_addr, data_addr);
+	res = rela_do_relocation(pContext, rel_flags, text_addr, data_addr);
 	if(res < 0){
 		printf_e("rela_do_relocation failed : 0x%X\n", res);
 		goto error;

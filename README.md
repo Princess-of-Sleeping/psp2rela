@@ -38,6 +38,8 @@ You can specify the flag with `-flag=`.
 
 - `-static_mode`: Convert to static elf after relocation.
 
+- `-fetch_base`: Fetch base from src elf instead of default address.
+
 Example : `./psp2rela -src=./input_module.self -dst=./output_module.self -flag=vvvf -log_dst=./log.txt`
 
 # Information
