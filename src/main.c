@@ -538,7 +538,7 @@ rebuild:
 	 * Rebuild segment infos
 	 */
 	for(int i=0;i<pContext->pEhdr->e_phnum;i++){
-		if(module_loader_is_elf(pContext) == 0 && pContext->pPhdr[i].p_filesz != 0){
+		if(module_loader_is_elf(pContext) == 0 && pContext->pSegmentInfo[i].compression == 2 && pContext->pPhdr[i].p_filesz != 0){
 			long unsigned int rel_config_size0_tmp = (pContext->pPhdr[i].p_filesz << 1) + 12;
 			void *rel_config0_tmp = malloc(rel_config_size0_tmp);
 
