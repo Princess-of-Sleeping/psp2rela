@@ -445,7 +445,7 @@ retry:
 		pRelaDataTop = pRelaData;
 		pRelaData = NULL;
 
-		printf_t("register symbol=%d:0x%08X\n", symbol_segment, offset_symbol);
+		// printf_t("register symbol=%d:0x%08X\n", symbol_segment, offset_symbol);
 
 		goto retry;
 	}

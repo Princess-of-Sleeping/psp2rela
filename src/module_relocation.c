@@ -20,7 +20,9 @@ int module_relocation_write(
 	){
 
 	int res = 0;
-	uint32_t val, tmp;
+	uint32_t val, tmp, prev;
+
+	prev = *dst;
 
 	switch(arm_rel_type){
 	case R_ARM_NONE:
@@ -29,10 +31,12 @@ int module_relocation_write(
 	case R_ARM_ABS32:
 	case R_ARM_TARGET1:
 		*dst = segment_src + offset_symbol;
+		printf_t("%s: 0x%08X -> 0x%08X (%s)\n", __FUNCTION__, prev, *dst, "R_ARM_ABS32");
 		break;
 	case R_ARM_REL32:
 	case R_ARM_TARGET2:
 		*dst = (segment_src - (offset_rel_target + segment_dst)) + offset_symbol;
+		printf_t("%s: 0x%08X -> 0x%08X (%s)\n", __FUNCTION__, prev, *dst, "R_ARM_REL32");
 		break;
 	case R_ARM_THM_CALL:
 	/*
@@ -54,24 +58,30 @@ int module_relocation_write(
 		     | ((val & 1) << 0xA)
 		     | ((offset_symbol >> 0xC) & 0x3FF);
 
+		printf_t("%s: 0x%08X -> 0x%08X (%s)\n", __FUNCTION__, __builtin_bswap32(prev), __builtin_bswap32(*dst), "R_ARM_THM_CALL");
 		break;
 	case R_ARM_CALL:
 	case R_ARM_JUMP24:
 		val = *dst;
 		offset_symbol = (segment_src - (offset_rel_target + segment_dst)) + offset_symbol;
-		if((val & 0xf0000000) == 0)
+		if((val & 0xf0000000) == 0){
 			val = (val & 0xfe7fffff) | ((offset_symbol & 3) << 0x17);
-
+		}
 		*dst = (val & 0xff000000) | (offset_symbol >> 2 & 0xffffff);
+		printf_t("(0x%08X)\n", offset_symbol);
+		printf_t("%s: 0x%08X -> 0x%08X (%s)\n", __FUNCTION__, prev, *dst, "R_ARM_CALL");
 		break;
 	case R_ARM_PREL31:
 		*dst = (((segment_src - (offset_rel_target + segment_dst)) + offset_symbol) & 0x7fffffff) | (*dst & 80000000);
+		printf_t("%s: 0x%08X -> 0x%08X (%s)\n", __FUNCTION__, prev, *dst, "R_ARM_PREL31");
 		break;
 	case R_ARM_MOVW_ABS_NC:
 		*dst = (*dst & 0xFFF0F000) | ((segment_src + offset_symbol) & 0xFFF) | (((segment_src + offset_symbol) << 4) & 0xF0000);
+		printf_t("%s: 0x%08X -> 0x%08X (%s)\n", __FUNCTION__, prev, *dst, "R_ARM_MOVW_ABS_NC");
 		break;
 	case R_ARM_MOVT_ABS:
 		*dst = (*dst & 0xFFF0F000) | ((segment_src + offset_symbol) >> 0x10 & 0xFFF) | (((segment_src + offset_symbol) >> 0x1C) << 0x10);
+		printf_t("%s: 0x%08X -> 0x%08X (%s)\n", __FUNCTION__, prev, *dst, "R_ARM_MOVT_ABS");
 		break;
 	case R_ARM_THM_MOVW_ABS_NC:
 
@@ -82,6 +92,8 @@ int module_relocation_write(
 
 		offset_symbol = segment_src + offset_symbol;
 		*dst = (*dst & 0x8F00FBF0) | ((offset_symbol & 0xFF) << 16) | ((offset_symbol & 0x700) << 0x14) | (((offset_symbol >> 0xB) & 1) << 10) | ((offset_symbol >> 0xC) & 0xF);
+
+		printf_t("%s: 0x%08X -> 0x%08X (%s)\n", __FUNCTION__, __builtin_bswap32(prev), __builtin_bswap32(*dst), "R_ARM_THM_MOVW_ABS_NC");
 		break;
 	case R_ARM_THM_MOVT_ABS:
 
@@ -92,6 +104,8 @@ int module_relocation_write(
 
 		offset_symbol = segment_src + offset_symbol;
 		*dst = (*dst & 0x8F00FBF0) | (offset_symbol & 0xFF0000) | ((offset_symbol >> 0x18 & 7) << 0x1C) | ((offset_symbol >> 0x11) & 0x400) | (offset_symbol >> 0x1C);
+
+		printf_t("%s: 0x%08X -> 0x%08X (%s)\n", __FUNCTION__, __builtin_bswap32(prev), __builtin_bswap32(*dst), "R_ARM_THM_MOVT_ABS");
 		break;
 	default:
 		res = 0x8002D019;

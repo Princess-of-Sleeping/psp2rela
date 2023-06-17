@@ -8,6 +8,7 @@
 #include <string.h>
 #include "data_register.h"
 #include "module_relocation_types.h"
+#include "../debug.h"
 
 #define RELA_DATA_REGISTER_POOL_SIZE (0x4000)
 #define RELA_DATA_REGISTER_POOL_ALIGN(length) ((length + (RELA_DATA_REGISTER_POOL_SIZE - 1)) & ~(RELA_DATA_REGISTER_POOL_SIZE - 1))
@@ -86,8 +87,10 @@ int rela_data_register_write_type0(
 	uint32_t append, uint32_t rel_type0, uint32_t rel_type1
 	){
 
-	if(symbol_segment >= 0x10 || target_segment >= 0x10 || append > 0x1E || rel_type0 >= 0x100 || rel_type1 >= 0x100)
+	if(symbol_segment >= 0x10 || target_segment >= 0x10 || append > 0x1E || rel_type0 >= 0x100 || rel_type1 >= 0x100){
+		// printf_t("%s: %s\n", __FUNCTION__, "RELA_ERROR_DATA_REGISTER_INVALID_PARAM");
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
+	}
 
 	SceRelInfoType0 rel_info;
 
@@ -113,8 +116,10 @@ int rela_data_register_write_type1(
 		symbol_segment >= (1 << 4) || symbol_address >= (1 << 22) ||
 		target_segment >= (1 << 4) || target_address >= (1 << 22) ||
 		rel_type >= (1 << 8)
-	)
+	){
+		// printf_t("%s: %s\n", __FUNCTION__, "RELA_ERROR_DATA_REGISTER_INVALID_PARAM");
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
+	}
 
 	SceRelInfoType1 rel_info;
 
@@ -131,8 +136,10 @@ int rela_data_register_write_type1(
 
 int rela_data_register_write_type2(uint32_t symbol_segment, uint32_t symbol_address, uint32_t target_address, uint32_t rel_type){
 
-	if(symbol_segment >= 0x10 || target_address >= (1 << 16))
+	if(symbol_segment >= 0x10 || target_address >= (1 << 16)){
+		// printf_t("%s: %s\n", __FUNCTION__, "RELA_ERROR_DATA_REGISTER_INVALID_PARAM");
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
+	}
 
 	SceRelInfoType2 rel_info;
 
@@ -147,8 +154,10 @@ int rela_data_register_write_type2(uint32_t symbol_segment, uint32_t symbol_addr
 
 int rela_data_register_write_type3(uint32_t symbol_segment, uint32_t symbol_address, uint32_t target_address, uint32_t append_offset, uint32_t is_thumb){
 
-	if(target_address >= (1 << 18) || append_offset >= (1 << 5) || is_thumb > 1)
+	if(target_address >= (1 << 18) || append_offset >= (1 << 5) || is_thumb > 1){
+		// printf_t("%s: %s\n", __FUNCTION__, "RELA_ERROR_DATA_REGISTER_INVALID_PARAM");
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
+	}
 
 	SceRelInfoType3 rel_info;
 
@@ -164,8 +173,10 @@ int rela_data_register_write_type3(uint32_t symbol_segment, uint32_t symbol_addr
 
 int rela_data_register_write_type4(uint32_t target_address, uint32_t append_offset){
 
-	if(target_address >= 0x10000000 || append_offset > 0x1E)
+	if(target_address >= 0x10000000 || append_offset > 0x1E){
+		// printf_t("%s: %s\n", __FUNCTION__, "RELA_ERROR_DATA_REGISTER_INVALID_PARAM");
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
+	}
 
 	SceRelInfoType4 rel_info;
 
@@ -181,8 +192,10 @@ int rela_data_register_write_type5(uint32_t target_offset1, uint32_t append_offs
 	if(
 		target_offset1 >= (1 << 9) || append_offset1 >= (1 << 5) ||
 		target_offset2 >= (1 << 9) || append_offset2 >= (1 << 5)
-	)
+	){
+		// printf_t("%s: %s\n", __FUNCTION__, "RELA_ERROR_DATA_REGISTER_INVALID_PARAM");
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
+	}
 
 	SceRelInfoType5 rel_info;
 
@@ -197,8 +210,10 @@ int rela_data_register_write_type5(uint32_t target_offset1, uint32_t append_offs
 
 int rela_data_register_write_type6(uint32_t target_address){
 
-	if(target_address >= (1 << 28))
+	if(target_address >= (1 << 28)){
+		// printf_t("%s: %s\n", __FUNCTION__, "RELA_ERROR_DATA_REGISTER_INVALID_PARAM");
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
+	}
 
 	SceRelInfoType6 rel_info;
 
@@ -210,8 +225,10 @@ int rela_data_register_write_type6(uint32_t target_address){
 
 int rela_data_register_write_type7(uint32_t target_address){
 
-	if(target_address >= 0x10000000)
+	if(target_address >= 0x10000000){
+		// printf_t("%s: %s\n", __FUNCTION__, "RELA_ERROR_DATA_REGISTER_INVALID_PARAM");
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
+	}
 
 	SceRelInfoType789 rel_info;
 
@@ -223,8 +240,10 @@ int rela_data_register_write_type7(uint32_t target_address){
 
 int rela_data_register_write_type8(uint32_t target_address){
 
-	if(target_address >= 0x10000000)
+	if(target_address >= 0x10000000){
+		// printf_t("%s: %s\n", __FUNCTION__, "RELA_ERROR_DATA_REGISTER_INVALID_PARAM");
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
+	}
 
 	SceRelInfoType789 rel_info;
 
@@ -236,8 +255,10 @@ int rela_data_register_write_type8(uint32_t target_address){
 
 int rela_data_register_write_type9(uint32_t target_address){
 
-	if(target_address >= 0x10000000)
+	if(target_address >= 0x10000000){
+		// printf_t("%s: %s\n", __FUNCTION__, "RELA_ERROR_DATA_REGISTER_INVALID_PARAM");
 		return RELA_ERROR_DATA_REGISTER_INVALID_PARAM;
+	}
 
 	SceRelInfoType789 rel_info;
 

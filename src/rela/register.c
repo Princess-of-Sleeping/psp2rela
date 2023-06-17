@@ -51,7 +51,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 
 		switch(_rel_info->type){
 		case 0:
-			printf_t("type%d\n", _rel_info->type);
+			// printf_t("type%d (%s)\n", _rel_info->type, "Base0");
 
 			offset_target = _rel_info->type0.r_target_offset;
 			offset_symbol = _rel_info->type0.r_symbol_offset;
@@ -72,7 +72,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			break;
 
 		case 1:
-			printf_t("type%d\n", _rel_info->type);
+			// printf_t("type%d (%s)\n", _rel_info->type, "Base1");
 
 			offset_target = (_rel_info->type1.r_target_offset_hi << 0xC) | _rel_info->type1.r_target_offset_lo;
 			offset_symbol = _rel_info->type1.r_symbol_offset;
@@ -92,7 +92,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			break;
 
 		case 2:
-			printf_t("type%d\n", _rel_info->type);
+			// printf_t("type%d (%s)\n", _rel_info->type, "TargetPlusSingle");
 
 			offset_target += _rel_info->type2.r_target_offset;
 			offset_symbol  = _rel_info->type2.r_symbol_offset;
@@ -110,7 +110,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			break;
 
 		case 3:
-			printf_t("type%d\n", _rel_info->type);
+			// printf_t("type%d (%s)\n", _rel_info->type, "TargetPlusMovwt");
 
 			offset_target += _rel_info->type3.r_target_offset;
 			offset_symbol  = _rel_info->type3.r_symbol_offset;
@@ -135,7 +135,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			break;
 
 		case 4:
-			printf_t("type%d\n", _rel_info->type);
+			// printf_t("type%d (%s)\n", _rel_info->type, "TargetPlusPrev");
 
 			offset_target += _rel_info->type4.r_target_offset;
 
@@ -148,7 +148,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			break;
 
 		case 5:
-			printf_t("type%d\n", _rel_info->type);
+			// printf_t("type%d (%s)\n", _rel_info->type, "TargetPlusDouble");
 
 			offset_target += _rel_info->type5.r_target_offset1;
 
@@ -169,7 +169,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 			if(_rel_info->type6.r_target_offset == 0)
 				return 0x8002D019;
 
-			printf_t("type%d\n", _rel_info->type);
+			// printf_t("type%d (%s)\n", _rel_info->type, "TargetPlusAbs32Single");
 
 			offset_target += _rel_info->type6.r_target_offset;
 
@@ -186,7 +186,7 @@ int rela_regiser_entrys(const SceRelInfo *rel_info, unsigned int rel_info_size, 
 		case 7:
 		case 8:
 		case 9:
-			printf_t("type%d\n", _rel_info->type);
+			// printf_t("type%d (%s)\n", _rel_info->type, "TargetPlusAbs32");
 			offsets789 = _rel_info->type789.r_target_offset;
 
 			/*
